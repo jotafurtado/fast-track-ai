@@ -17,7 +17,7 @@ while [ $# -gt 0 ]; do
 done
 
 mkdir -p "$agents_dir"
-for skill in "$method_root"/skills/dot-ai-* "$method_root"/skills/shared; do
+for skill in "$method_root"/skills/dot-ai-*; do
   [ -d "$skill" ] || continue
   ln -sfn "$skill" "$agents_dir/$(basename "$skill")"
   echo "linked $(basename "$skill") -> $agents_dir"
@@ -25,7 +25,7 @@ done
 
 if [ -d "$(dirname "$claude_dir")" ]; then
   mkdir -p "$claude_dir"
-  for link in "$agents_dir"/dot-ai-* "$agents_dir"/shared; do
+  for link in "$agents_dir"/dot-ai-*; do
     [ -e "$link" ] || continue
     ln -sfn "../../.agents/skills/$(basename "$link")" "$claude_dir/$(basename "$link")"
   done

@@ -6,9 +6,10 @@ Method `dot-ai`, agent-driven SDLC. Binding norm lives in Obsidian, `10 - Projet
 
 - `commands/` - slash commands, 1 file per command (`dot-ai-init`, `dot-ai-intent`, `dot-ai-plan`, `dot-ai-implement`, `dot-ai-research`, `dot-ai-handoff`)
 - `skills/dot-ai-*/SKILL.md` - procedure each command runs
-- `skills/dot-ai-init/scripts/` - `dot-ai-init.sh`, installs the tree into the target, nothing vendored
-- `skills/shared/scripts/` - `dot-ai-index.sh`, `dot-ai-specify.sh`, `sdd-gate.sh`, POSIX bash, no dependencies beyond `grep`, `sed`, `awk`
-- `skills/shared/templates/` - `intent.md`, `plan.md`, `tasks.md`, `decisions.md`, `AGENTS-snippet.md`
+- `skills/dot-ai-init/` - SKILL.md plus `scripts/` (`dot-ai-init.sh`, `dot-ai-index.sh`) plus `assets/` (`AGENTS-snippet.md`)
+- `skills/dot-ai-intent/` - SKILL.md plus `scripts/` (`dot-ai-specify.sh`) plus `assets/` (`intent.md`)
+- `skills/dot-ai-plan/` - SKILL.md plus `scripts/` (`sdd-gate.sh`) plus `assets/` (`plan.md`, `tasks.md`, `decisions.md`)
+- `skills/dot-ai-implement/`, `dot-ai-research/`, `dot-ai-handoff/` - SKILL.md only, referencing owner copies
 
 Skills run against the target repo `dot-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `dot-ai-init` installs anything, through its own script path.
 
@@ -22,13 +23,13 @@ Skills run against the target repo `dot-ai/` tree using scripts and templates bu
 
 ## Install
 
-`install.sh` links every `skills/dot-ai-*` plus `skills/shared` into the harness skills dirs. The `shared` link is load-bearing: skills resolve `../shared` relative to their installed location. Same link set on any machine:
+`install.sh` links every `skills/dot-ai-*` into the harness skills dirs. No `shared` link exists: each skill owns its resources and cross-skill references point at owner copies. Same link set on any machine:
 
 ```bash
 rm -rf /tmp/dot-ai-test && mkdir -p /tmp/dot-ai-test
 ./skills/dot-ai-init/scripts/dot-ai-init.sh /tmp/dot-ai-test
-./skills/shared/scripts/dot-ai-index.sh /tmp/dot-ai-test
-./skills/shared/scripts/sdd-gate.sh --track 001-exemplo --root /tmp/dot-ai-test || true
+./skills/dot-ai-init/scripts/dot-ai-index.sh /tmp/dot-ai-test
+./skills/dot-ai-plan/scripts/sdd-gate.sh --track 001-exemplo --root /tmp/dot-ai-test || true
 ```
 
 `init` must be idempotent: run twice with no error and no duplicated blocks in `AGENTS.md`.
