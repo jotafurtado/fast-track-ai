@@ -1,0 +1,18 @@
+# .DS_Store and OS artifacts
+.DS_Store
+Thumbs.db
+
+# Temp and swap
+*.tmp
+*.swp
+*~
+
+# Editors
+.vscode/
+.idea/
+
+# Harness local state
+.omp/
+
+# Scratch test dirs
+/tmp/
