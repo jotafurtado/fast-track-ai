@@ -14,5 +14,8 @@ Thumbs.db
 # Harness local state
 .omp/
 
+# Spec Kit runtime (project config already tracked stays tracked)
+.specify/
+
 # Scratch test dirs
 /tmp/
