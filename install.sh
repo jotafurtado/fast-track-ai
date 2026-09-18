@@ -16,6 +16,26 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+relpath() {
+  local from_dir to result
+  from_dir="$(cd "${1%/}" && pwd)"
+  if [ -d "${2%/}" ]; then
+    to="$(cd "${2%/}" && pwd)"
+  else
+    to="$(cd "$(dirname "${2%/}")" && pwd)/$(basename "${2%/}")"
+  fi
+  result=""
+  while [ "$from_dir" != "/" ] && [ "${to#"$from_dir"/}" = "$to" ]; do
+    from_dir="$(dirname "$from_dir")"
+    result="${result}../"
+  done
+  if [ "$from_dir" = "/" ]; then
+    printf '%s%s' "$result" "${to#/}"
+  else
+    printf '%s%s' "$result" "${to#"$from_dir"/}"
+  fi
+}
+
 mkdir -p "$agents_dir"
 for skill in "$method_root"/skills/dot-ai-*; do
   [ -d "$skill" ] || continue
@@ -27,7 +47,7 @@ if [ -d "$(dirname "$claude_dir")" ]; then
   mkdir -p "$claude_dir"
   for link in "$agents_dir"/dot-ai-*; do
     [ -e "$link" ] || continue
-    ln -sfn "../../.agents/skills/$(basename "$link")" "$claude_dir/$(basename "$link")"
+    ln -sfn "$(relpath "$claude_dir" "$link")" "$claude_dir/$(basename "$link")"
   done
   echo "claude mirrors updated in $claude_dir"
 fi

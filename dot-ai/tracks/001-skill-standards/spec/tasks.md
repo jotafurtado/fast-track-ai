@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # Tasks: Skill Standards Compliance
 
 **Input**: Design documents from `/specs/001-skill-standards/`
@@ -64,3 +68,30 @@ US1 → US2 (audit first, migration second) → US3 (evals run against migrated 
 ## Implementation Strategy
 
 MVP first: US1 audit plus description fixes. Then US2 migration. Then US3 evals. Each story independently testable and shippable.
+
+## Phase 6: Convergence
+
+- [x] T022 Amend the constitution and impact report to replace the mandatory `shared` link with the approved owner-copy layout per Constitution III and FR-005 (contradicts)
+  - Files: `.specify/memory/constitution.md`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh constitution`
+- [x] T023 Harden the gate and approval contract so draft intents, unapproved artifacts, and open full-cycle tasks cannot pass per FR-007 and Constitution IV (contradicts)
+  - Files: `.specify/templates/plan-template.md`, `.specify/templates/tasks-template.md`, `skills/dot-ai-init/assets/AGENTS-snippet.md`, `skills/dot-ai-plan/SKILL.md`, `skills/dot-ai-plan/assets/plan.md`, `skills/dot-ai-plan/assets/tasks.md`, `skills/dot-ai-plan/scripts/sdd-gate.sh`, `skills/dot-ai-implement/SKILL.md`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh approval`
+- [x] T024 Fix custom Claude mirrors to resolve from the configured agents directory and validate both harness layouts per Constitution III and the install contract (contradicts)
+  - Files: `install.sh`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh install`
+- [x] T025 Replace aggregate audit claims with one evidence-backed verdict per rule and skill, resolve every failure, and re-audit per FR-001, FR-008, US1/AC1-2, and SC-001/002 (partial)
+  - Files: `dot-ai/tracks/001-skill-standards/spec/audit.md`, `dot-ai/tracks/001-skill-standards/spec/checklists/requirements.md`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh audit`
+- [x] T026 Reference every bundled script and asset from its owner skill with explicit usage guidance or remove the unused resource, including `dot-ai-specify.sh` and `assets/decisions.md`, per FR-003 (partial)
+  - Files: `skills/dot-ai-init/SKILL.md`, `skills/dot-ai-intent/SKILL.md`, `skills/dot-ai-plan/SKILL.md`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh resources`
+- [x] T027 Repair the `dot-ai-specify` bridge to require an approved intent, emit the correct OMP command, route output to the canonical track spec, and add `/tmp` verification per FR-004 and the plan script-ownership decision (partial)
+  - Files: `skills/dot-ai-intent/scripts/dot-ai-specify.sh`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh specify`
+- [x] T028 Add an executable deterministic eval runner for init, index, gate, wrapper, install, audit, resource, constitution, and contract behavior without masked failures per FR-006, SC-004, and US3/AC1-2 (partial)
+  - Files: `AGENTS.md`, `dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh`, `dot-ai/tracks/001-skill-standards/spec/evals.md`
+  - Validate: `bash -n dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh && bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh self`
+- [x] T029 Reconcile the package path contract with the sibling owner-copy paths that installed skills actually use per SC-003 and the plan structure decision (contradicts)
+  - Files: `dot-ai/tracks/001-skill-standards/spec/contracts/skill-package.md`
+  - Validate: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh contract`

@@ -7,12 +7,26 @@ target="${1:-.}"
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 assets="$(cd "$script_dir/../assets" && pwd)"
 
+specs="$target/specs"
+if [ -L "$specs" ]; then
+  specs_target="$(readlink "$specs")"
+  if [ "$specs_target" != "dot-ai/specs" ]; then
+    echo "ERROR: $specs points to $specs_target; expected dot-ai/specs." >&2
+    echo "Move existing specs into dot-ai/tracks/<track>/spec before running dot-ai-init.sh." >&2
+    exit 1
+  fi
+elif [ -e "$specs" ]; then
+  echo "ERROR: $specs already exists and is not the dot-ai specs view." >&2
+  echo "Move existing specs into dot-ai/tracks/<track>/spec before running dot-ai-init.sh." >&2
+  exit 1
+fi
+
 mkdir -p "$target/dot-ai/research" "$target/dot-ai/refs" \
   "$target/dot-ai/handoffs/archive" "$target/dot-ai/assessments" \
   "$target/dot-ai/decisions" "$target/dot-ai/tracks" "$target/dot-ai/specs"
 
-if [ ! -e "$target/specs" ]; then
-  ln -s "dot-ai/specs" "$target/specs"
+if [ ! -L "$specs" ]; then
+  ln -s "dot-ai/specs" "$specs"
 fi
 
 if [ -d "$target/.specify" ] && [ ! -e "$target/.specify/assessments" ]; then

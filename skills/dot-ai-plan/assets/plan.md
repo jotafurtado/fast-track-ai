@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # Plan: NNN-slug
 
 ## Phase 1: name

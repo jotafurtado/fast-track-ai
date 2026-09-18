@@ -1,8 +1,9 @@
 <!-- Sync Impact Report:
-Version change: none → 1.0.0 (initial ratification)
-Modified principles: none (all sections new)
-Added sections: Core Principles I–V, Additional Constraints, Development Workflow, Governance
+Version change: 1.0.0 → 1.1.0
+Modified principles: III. Package Portability (owner-copy layout; mandatory shared link removed)
+Added sections: none
 Removed sections: none
+Migration effect: `install.sh` links the six `dot-ai-*` skill trees only; each script and template lives under its owner skill; cross-skill references use package-relative sibling owner paths; no `shared` symlink is required
 Follow-up TODOs: none
 -->
 
@@ -17,7 +18,7 @@ Every change delivers exactly one behavior. A change MUST be validated in `/tmp`
 A published script MUST actually run. Every script under `skills/` MUST pass `bash -n` and the end-to-end `/tmp` test: init, index, gate. Placeholders, mocks, and `TODO: implement` MUST NOT be committed.
 
 ### III. Package Portability (NON-NEGOTIABLE)
-The method MUST work on any machine. Machine-fixed paths are forbidden. Skills MUST resolve scripts and templates relative to their installed package location; the `shared` link is load-bearing and every installation MUST include it via `install.sh`. Target repos receive only the `dot-ai/` data tree, never vendored method internals.
+The method MUST work on any machine. Machine-fixed paths are forbidden. Each script and template has one owner skill; cross-skill consumers MUST reference the owner copy via package-relative sibling paths from the installed skill tree. `install.sh` links only the six `dot-ai-*` skill trees and no shared link is required. Skills MUST resolve bundled resources relative to their installed package location. Target repos receive only the `dot-ai/` data tree, never vendored method internals.
 
 ### IV. Gate-Locked Flow
 Work MUST follow intent → plan → implement, with user approval at each gate. No approved intent means no `plan.md`, no `spec/`, no code. No approved plan means no implementation. Locks have no exceptions and MUST be encoded in the skills, not left to agent discretion. Track roots MUST contain only allowlisted entries; auxiliary outputs MUST live under `assets/`.
@@ -37,4 +38,4 @@ Method changes validate in `/tmp`, never in a live target. `init` MUST be idempo
 
 This constitution governs Spec Kit runtime usage in this repo and supersedes ad-hoc practices. The method design itself is governed by the binding norm in Obsidian (`10 - Projetos/Code/dot-ai/dot-ai - Fundamentos v1.2.md`); conflicts between the two MUST be raised to the user before proceeding. Amendments require documentation, explicit user approval, and a migration plan for existing tracks when identifiers change. Versioning follows semantic versioning: MAJOR for incompatible governance or principle removals, MINOR for new principles or sections, PATCH for clarifications. Compliance is verified on every review via the Validation block.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-15
+**Version**: 1.1.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-16

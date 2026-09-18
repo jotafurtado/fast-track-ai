@@ -32,3 +32,4 @@
 ## Notes
 
 - Validation iteration 2: all items pass. Ready for `/speckit.clarify` or `/speckit.plan`.
+- Convergence re-audit (2026-09-16): `audit.md` holds 36 evidence-backed PASS rows (6 skills × 6 rules), one exact quote per row; no FAIL or PARTIAL rows remain.

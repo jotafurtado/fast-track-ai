@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # Tasks: NNN-slug
 
 - [ ] Task 1: name. Files: list. Validate: command or acceptance.

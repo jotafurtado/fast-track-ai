@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # Implementation Plan: Skill Standards Compliance
 
 **Branch**: `001-skill-standards` | **Date**: 2026-09-15 | **Spec**: [spec.md](./spec.md)
@@ -75,3 +79,57 @@ skills/
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | — | — | — |
+
+## Phase 6: Convergence Remediation
+
+**Done**: The eight convergence findings are fixed, each targeted validation passes, the full regression runner passes, and the final structural gate passes while the track remains `active` for user review.
+
+**Files**:
+
+- `.specify/memory/constitution.md`
+- `.specify/templates/plan-template.md`
+- `.specify/templates/tasks-template.md`
+- `AGENTS.md`
+- `install.sh`
+- `skills/dot-ai-init/SKILL.md`
+- `skills/dot-ai-init/assets/AGENTS-snippet.md`
+- `skills/dot-ai-intent/SKILL.md`
+- `skills/dot-ai-intent/scripts/dot-ai-specify.sh`
+- `skills/dot-ai-plan/SKILL.md`
+- `skills/dot-ai-plan/assets/plan.md`
+- `skills/dot-ai-plan/assets/tasks.md`
+- `skills/dot-ai-plan/scripts/sdd-gate.sh`
+- `skills/dot-ai-implement/SKILL.md`
+- `dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh`
+- `dot-ai/tracks/001-skill-standards/spec/audit.md`
+- `dot-ai/tracks/001-skill-standards/spec/checklists/requirements.md`
+- `dot-ai/tracks/001-skill-standards/spec/contracts/skill-package.md`
+- `dot-ai/tracks/001-skill-standards/spec/evals.md`
+- `dot-ai/tracks/001-skill-standards/spec/plan.md`
+- `dot-ai/tracks/001-skill-standards/spec/tasks.md`
+- `dot-ai/INDEX.md`
+
+**Accept**: `bash dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh all` and `skills/dot-ai-plan/scripts/sdd-gate.sh --track 001-skill-standards --root .` both exit 0.
+
+### Execution Order
+
+1. T028 creates the shared regression runner and proves its fixture self-check.
+2. T022, T024, T027, and T029 may run in parallel because they edit different files.
+3. T023 runs before T026 because both may edit `skills/dot-ai-plan/SKILL.md`.
+4. T025 runs after every source fix and records the final evidence-backed audit.
+5. The main agent runs the complete eval suite, structural gate, review, checkbox mirror, and index regeneration.
+
+### Task File Boundaries
+
+- T022: `.specify/memory/constitution.md`
+- T023: `.specify/templates/plan-template.md`, `.specify/templates/tasks-template.md`, `skills/dot-ai-init/assets/AGENTS-snippet.md`, `skills/dot-ai-plan/SKILL.md`, `skills/dot-ai-plan/assets/plan.md`, `skills/dot-ai-plan/assets/tasks.md`, `skills/dot-ai-plan/scripts/sdd-gate.sh`, `skills/dot-ai-implement/SKILL.md`
+- T024: `install.sh`
+- T025: `dot-ai/tracks/001-skill-standards/spec/audit.md`, `dot-ai/tracks/001-skill-standards/spec/checklists/requirements.md`
+- T026: `skills/dot-ai-init/SKILL.md`, `skills/dot-ai-intent/SKILL.md`, `skills/dot-ai-plan/SKILL.md`
+- T027: `skills/dot-ai-intent/scripts/dot-ai-specify.sh`
+- T028: `AGENTS.md`, `dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh`, `dot-ai/tracks/001-skill-standards/spec/evals.md`
+- T029: `dot-ai/tracks/001-skill-standards/spec/contracts/skill-package.md`
+
+## Out of Scope
+
+Third-party base skills and the full skill-creator benchmark viewer remain outside this track.

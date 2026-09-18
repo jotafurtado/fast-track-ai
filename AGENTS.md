@@ -26,10 +26,24 @@ Skills run against the target repo `dot-ai/` tree using scripts and templates bu
 `install.sh` links every `skills/dot-ai-*` into the harness skills dirs. No `shared` link exists: each skill owns its resources and cross-skill references point at owner copies. Same link set on any machine:
 
 ```bash
-rm -rf /tmp/dot-ai-test && mkdir -p /tmp/dot-ai-test
-./skills/dot-ai-init/scripts/dot-ai-init.sh /tmp/dot-ai-test
-./skills/dot-ai-init/scripts/dot-ai-index.sh /tmp/dot-ai-test
-./skills/dot-ai-plan/scripts/sdd-gate.sh --track 001-exemplo --root /tmp/dot-ai-test || true
+./dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh all
 ```
 
 `init` must be idempotent: run twice with no error and no duplicated blocks in `AGENTS.md`.
+
+<!-- BEGIN MANAGED BLOCK: dot-ai. Installed by dot-ai-init, idempotent block. -->
+
+## dot-ai
+
+Active memory in `dot-ai/`. Read `dot-ai/INDEX.md` first, never scan the whole tree.
+
+Mandatory flow, no exceptions: a new request becomes `intent.md` first. No approved intent means no `plan.md`, no `spec/`, no code. No `plan.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `dot-ai/tracks/NNN-slug/intent.md`, drafted by the `dot-ai-intent` skill.
+
+- Valid handoff: only the 3 most recent in `dot-ai/handoffs/`. Ignore `archive/`.
+- A track with `plan.md` and no `spec/` has no spec. Do not look for one.
+- Track root holds only `intent.md`, `plan.md`, `tasks.md`, `decisions.md`, plus `spec/` and `assets/`. Loose files are forbidden. Auxiliary outputs go under `assets/`.
+- `refs/` is immutable. Source changed, new file.
+- A recorded decision is never relitigated.
+- Full cycle: the `dot-ai-specify` wrapper from the skill package, run with the target repo as working directory. Never the Spec Kit script directly.
+
+<!-- END MANAGED BLOCK: dot-ai -->
