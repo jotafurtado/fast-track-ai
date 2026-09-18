@@ -1,0 +1,41 @@
+---
+status: approved
+---
+
+# Plan: 005-lightweight-sdlc
+
+## Phase 1: Catalog templates
+Done: Every catalog type has a thin English template and frontmatter. `via` is gone from the intent template. `spec.md` is owned by the intent skill.
+Files: `skills/dot-ai-intent/assets/intent.md`, `skills/dot-ai-intent/assets/spec.md`, `skills/dot-ai-plan/assets/plan.md`, `skills/dot-ai-plan/assets/tasks.md`, `skills/dot-ai-plan/assets/decisions.md`, `skills/dot-ai-init/assets/assessment.md`
+Accept: Each template file exists with the frontmatter listed in `spec.md`.
+
+## Phase 2: Single cycle, no Spec Kit
+Done: Skills, gate, init, and index implement one cycle. Specify is deleted. `spec/` does not select a cycle. Index columns are `track` and `status`.
+Files: `skills/dot-ai-intent/SKILL.md`, `skills/dot-ai-intent/scripts/dot-ai-specify.sh`, `skills/dot-ai-plan/SKILL.md`, `skills/dot-ai-plan/scripts/sdd-gate.sh`, `skills/dot-ai-implement/SKILL.md`, `skills/dot-ai-init/SKILL.md`, `skills/dot-ai-init/scripts/dot-ai-init.sh`, `skills/dot-ai-init/scripts/dot-ai-index.sh`, `skills/dot-ai-init/assets/AGENTS-snippet.md`, `skills/dot-ai-research/SKILL.md`, `skills/dot-ai-handoff/SKILL.md`, `commands/dot-ai-init.md`, `commands/dot-ai-intent.md`, `commands/dot-ai-plan.md`, `commands/dot-ai-implement.md`, `commands/dot-ai-research.md`, `commands/dot-ai-handoff.md`
+Accept: Gate requires track-root `spec.md` and ignores `spec/` as a cycle; init creates no `specs/` or `.specify/` paths; `dot-ai-specify.sh` is gone.
+
+## Phase 3: Rebrand package surface
+Done: Skill directories, `name` fields, commands, scripts, installer globs, and sibling owner paths use `fast-track-ai-*`. Gate script is `fast-track-ai-gate.sh`.
+Files: `skills/dot-ai-*` (renamed), `commands/dot-ai-*.md` (renamed), `install.sh`, every SKILL.md and command after the rename, `skills/fast-track-ai-init/scripts/fast-track-ai-init.sh`, `skills/fast-track-ai-init/scripts/fast-track-ai-index.sh`, `skills/fast-track-ai-plan/scripts/fast-track-ai-gate.sh`
+Accept: `install.sh` links six `fast-track-ai-*` skills and zero `dot-ai-*` skills.
+
+## Phase 4: Rebrand this repo's method memory
+Done: `dot-ai/` is `fast-track-ai/`. Live intents no longer have `via`. `003` is `dropped`. `001` has a thin root `spec.md` pointing at frozen `spec/`. Root `specs` and `.specify/` are gone. AGENTS map and managed block say `fast-track-ai`.
+Files: `dot-ai/` (renamed to `fast-track-ai/`), `AGENTS.md`, `specs`, `.specify/`, `fast-track-ai/tracks/001-skill-standards/intent.md`, `fast-track-ai/tracks/001-skill-standards/spec.md`, `fast-track-ai/tracks/002-assessment-standard/intent.md`, `fast-track-ai/tracks/003-full-cycle-contract/intent.md`, `fast-track-ai/tracks/004-adr-standard/intent.md`, `fast-track-ai/tracks/005-lightweight-sdlc/intent.md`, `fast-track-ai/INDEX.md`
+Accept: `test -d fast-track-ai/tracks` and `test ! -e dot-ai` and `test ! -e specs` and `test ! -e .specify`; index has no `via` column; `003` status is `dropped`.
+
+## Phase 5: Live evals and package contract
+Done: Live runner and evals table match the new prefix and cycle. Frozen 001 prose is untouched. Package contract uses `fast-track-ai-*` sibling paths.
+Files: `fast-track-ai/tracks/001-skill-standards/spec/assets/run-evals.sh`, `fast-track-ai/tracks/001-skill-standards/spec/evals.md`, `fast-track-ai/tracks/001-skill-standards/spec/contracts/skill-package.md`
+Accept: `specify` selector is gone; a `spec` selector asserts required track-root `spec.md` and rejects missing spec before plan approval.
+
+## Phase 6: Scratch validation
+Done: Init, index, gate, and install are green on a fresh `/tmp` target. A second init is idempotent. This repo is not used as the scratch target.
+Files: none in this repo beyond reading the scripts above
+Accept: `bash fast-track-ai/tracks/001-skill-standards/spec/assets/run-evals.sh all` exits 0.
+
+## Out of scope
+Rewriting the Obsidian binding norm. Changing Matt Pocock skill internals. Closing `002` or `004` beyond thin baselines. Rewriting frozen 001 prose (`spec.md`, `audit.md`, `plan.md`, `tasks.md`, `research.md`, `data-model.md`). Shipping a second specification cycle. Editing a live third-party target.
+
+## File rules
+Auxiliary outputs go under `assets/`, never loose at the track root. Track root holds `intent.md`, `spec.md`, `plan.md`, `tasks.md`, `decisions.md`, plus `assets/`. `spec/` is historical leftover on `001` only and does not select a cycle.

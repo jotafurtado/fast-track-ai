@@ -1,17 +1,17 @@
-# AGENTS.md - dot-ai repo
+# AGENTS.md - fast-track-ai repo
 
-Method `dot-ai`, agent-driven SDLC. Binding norm lives in Obsidian, `10 - Projetos/Code/dot-ai/dot-ai - Fundamentos v1.2.md`. Obsidian holds only the norm. This repo holds the executable: skills, commands, scripts, and templates, all inside `skills/`.
+Method `fast-track-ai`, a lightweight agent-driven SDLC. Binding norm lives in Obsidian, `10 - Projetos/Code/dot-ai/dot-ai - Fundamentos v1.2.md`. Obsidian holds only the norm. This repo holds the executable: skills, commands, scripts, and templates, all inside `skills/`.
 
 ## Map
 
-- `commands/` - slash commands, 1 file per command (`dot-ai-init`, `dot-ai-intent`, `dot-ai-plan`, `dot-ai-implement`, `dot-ai-research`, `dot-ai-handoff`)
-- `skills/dot-ai-*/SKILL.md` - procedure each command runs
-- `skills/dot-ai-init/` - SKILL.md plus `scripts/` (`dot-ai-init.sh`, `dot-ai-index.sh`) plus `assets/` (`AGENTS-snippet.md`)
-- `skills/dot-ai-intent/` - SKILL.md plus `scripts/` (`dot-ai-specify.sh`) plus `assets/` (`intent.md`)
-- `skills/dot-ai-plan/` - SKILL.md plus `scripts/` (`sdd-gate.sh`) plus `assets/` (`plan.md`, `tasks.md`, `decisions.md`)
-- `skills/dot-ai-implement/`, `dot-ai-research/`, `dot-ai-handoff/` - SKILL.md only, referencing owner copies
+- `commands/` - slash commands, 1 file per command (`fast-track-ai-init`, `fast-track-ai-intent`, `fast-track-ai-plan`, `fast-track-ai-implement`, `fast-track-ai-research`, `fast-track-ai-handoff`)
+- `skills/fast-track-ai-*/SKILL.md` - procedure each command runs
+- `skills/fast-track-ai-init/` - SKILL.md plus `scripts/` (`fast-track-ai-init.sh`, `fast-track-ai-index.sh`) plus `assets/` (`AGENTS-snippet.md`, `assessment.md`)
+- `skills/fast-track-ai-intent/` - SKILL.md plus `assets/` (`intent.md`, `spec.md`)
+- `skills/fast-track-ai-plan/` - SKILL.md plus `scripts/` (`fast-track-ai-gate.sh`) plus `assets/` (`plan.md`, `tasks.md`, `decisions.md`)
+- `skills/fast-track-ai-implement/`, `fast-track-ai-research/`, `fast-track-ai-handoff/` - SKILL.md only, referencing owner copies
 
-Skills run against the target repo `dot-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `dot-ai-init` installs anything, through its own script path.
+Skills run against the target repo `fast-track-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `fast-track-ai-init` installs anything, through its own script path.
 
 ## Rules
 
@@ -20,30 +20,30 @@ Skills run against the target repo `dot-ai/` tree using scripts and templates bu
 - Surgical changes: 1 behavior per change, validated in `/tmp` before commit.
 - No stubs: a published script must actually run in the test below.
 - A live target project is never edited from here. Method changes validate in `/tmp`.
+- Each script and template has one owner skill. Cross-skill consumers reference the owner copy via package-relative sibling paths. No `shared` link.
 
 ## Install
 
-`install.sh` links every `skills/dot-ai-*` into the harness skills dirs. No `shared` link exists: each skill owns its resources and cross-skill references point at owner copies. Same link set on any machine:
+`install.sh` links every `skills/fast-track-ai-*` into the harness skills dirs. No `shared` link exists: each skill owns its resources and cross-skill references point at owner copies. Same link set on any machine:
 
 ```bash
-./dot-ai/tracks/001-skill-standards/spec/assets/run-evals.sh all
+./fast-track-ai/tracks/001-skill-standards/spec/assets/run-evals.sh all
 ```
 
 `init` must be idempotent: run twice with no error and no duplicated blocks in `AGENTS.md`.
 
-<!-- BEGIN MANAGED BLOCK: dot-ai. Installed by dot-ai-init, idempotent block. -->
+<!-- BEGIN MANAGED BLOCK: fast-track-ai. Installed by fast-track-ai-init, idempotent block. -->
 
-## dot-ai
+## fast-track-ai
 
-Active memory in `dot-ai/`. Read `dot-ai/INDEX.md` first, never scan the whole tree.
+Active memory in `fast-track-ai/`. Read `fast-track-ai/INDEX.md` first, never scan the whole tree.
 
-Mandatory flow, no exceptions: a new request becomes `intent.md` first. No approved intent means no `plan.md`, no `spec/`, no code. No `plan.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `dot-ai/tracks/NNN-slug/intent.md`, drafted by the `dot-ai-intent` skill.
+Mandatory flow, no exceptions: a new request becomes `intent.md` first. No approved intent means no `spec.md`, no `plan.md`, no code. No `spec.md` means no plan approval. No `plan.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`, drafted by the `fast-track-ai-intent` skill.
 
-- Valid handoff: only the 3 most recent in `dot-ai/handoffs/`. Ignore `archive/`.
-- A track with `plan.md` and no `spec/` has no spec. Do not look for one.
-- Track root holds only `intent.md`, `plan.md`, `tasks.md`, `decisions.md`, plus `spec/` and `assets/`. Loose files are forbidden. Auxiliary outputs go under `assets/`.
+- Valid handoff: only the 3 most recent in `fast-track-ai/handoffs/`. Ignore `archive/`.
+- Track root holds only `intent.md`, `spec.md`, `plan.md`, `tasks.md`, `decisions.md`, plus `assets/`. A leftover `spec/` directory is historical and does not select a cycle. Loose files are forbidden. Auxiliary outputs go under `assets/`.
 - `refs/` is immutable. Source changed, new file.
 - A recorded decision is never relitigated.
-- Full cycle: the `dot-ai-specify` wrapper from the skill package, run with the target repo as working directory. Never the Spec Kit script directly.
+- Each script and template has one owner skill. Cross-skill consumers reference the owner copy via package-relative sibling paths. No `shared` link.
 
-<!-- END MANAGED BLOCK: dot-ai -->
+<!-- END MANAGED BLOCK: fast-track-ai -->

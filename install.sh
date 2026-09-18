@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh links the dot-ai skills into a harness skills directory.
+# install.sh links the fast-track-ai skills into a harness skills directory.
 # Usage: install.sh [--agents-dir DIR] [--claude-dir DIR]
 # Defaults: ~/.agents/skills and ~/.claude/skills. Works on any machine.
 set -euo pipefail
@@ -37,7 +37,7 @@ relpath() {
 }
 
 mkdir -p "$agents_dir"
-for skill in "$method_root"/skills/dot-ai-*; do
+for skill in "$method_root"/skills/fast-track-ai-*; do
   [ -d "$skill" ] || continue
   ln -sfn "$skill" "$agents_dir/$(basename "$skill")"
   echo "linked $(basename "$skill") -> $agents_dir"
@@ -45,7 +45,7 @@ done
 
 if [ -d "$(dirname "$claude_dir")" ]; then
   mkdir -p "$claude_dir"
-  for link in "$agents_dir"/dot-ai-*; do
+  for link in "$agents_dir"/fast-track-ai-*; do
     [ -e "$link" ] || continue
     ln -sfn "$(relpath "$claude_dir" "$link")" "$claude_dir/$(basename "$link")"
   done
