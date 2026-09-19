@@ -1,33 +1,43 @@
 ---
 id: 004-adr-standard
-status: draft
+status: shipped
 research: []
+assessments: []
+refs: []
 decisions: []
 ---
 
 # Intent: ADR Standard
 
 ## Problem
-The method exposes `dot-ai/decisions/` and a track-level `decisions.md` template, but it does not define what qualifies as a decision record, how decisions are identified, which context and alternatives must be preserved, or when an agent must capture a user decision. As a result, durable architectural knowledge can remain only in conversation history or be recorded as an unstructured note.
+The method exposes `fast-track-ai/decisions/` and a thin track-level `decisions.md` template (`id`, `status`, `date`, `owner`, Context, Decision, Consequence), but it does not define what qualifies as an Architecture Decision Record, how records are identified, when an agent must capture a user decision, or how an intent cites one. Durable choices therefore live in conversation or as an unstructured track note. The directory `fast-track-ai/decisions/` is empty. Track `005` already has four complete records in `decisions.md`.
 
 ## Proposed outcome
-All durable architectural and method-governance decisions are represented as Architecture Decision Records stored under the existing `dot-ai/decisions/` directory. The directory name remains `decisions`; ADR defines the document standard, not a replacement directory name. Each ADR preserves the context, decision, rationale, alternatives considered, consequences, status, ownership, date, and references needed for future maintainers to understand why the choice was made. When the user makes an architecturally significant decision, the agent creates or updates the corresponding ADR without requiring a separate request.
+A qualifying decision is durable, costly to reverse, surprising without context, or the result of a meaningful trade-off. Capture is mandatory once the maintainer decides such a matter. Trivial wording, formatting, and easily reversible operational choices are not ADRs.
+
+An ADR is repository-wide, stored at `fast-track-ai/decisions/<NNN-slug>.md`. An intent may cite zero or more slugs in `decisions:`. There is no required track-owned `decisions.md`. The directory name stays `decisions`; ADR is the document standard.
+
+A file exists only after the decision is made. Allowed `status` values are `accepted` and `superseded`. Accepted Decision text is immutable. A change is a new ADR that supersedes the old one (`superseded_by` on the old file). Typos outside the Decision section may be fixed; the Decision section is not rewritten.
+
+Each ADR keeps English frontmatter and sections: context, decision, rationale, alternatives considered, consequences, status, owner, date, and references when they exist.
+
+`fast-track-ai/INDEX.md` lists ADRs in a third table (`decision`, `status`). The index validates required fields and the two statuses.
+
+Existing complete records (context, decision, consequence already present) may be promoted into `fast-track-ai/decisions/` without inventing missing alternatives or rationale. Conversation-only choices stay unfiled unless the maintainer restates them. `005`'s four records qualify for promotion.
+
+When the user makes a qualifying decision during a later track, the agent files the ADR without a separate request.
 
 ## Users and systems
-Project maintainers make and review decisions. Coding agents detect qualifying decisions, capture them, link them to tracks, and consult existing ADRs before reopening settled questions. The affected systems are the dot-ai domain model, decision storage, track references, templates, index, installed AGENTS rules, and implementation workflow.
+Project maintainers make and review decisions. Coding agents detect qualifying decisions, file them, cite them on intents, and refuse to relitigate an accepted ADR. Affected systems: `fast-track-ai/decisions/`, the plan-owned decisions template, intent `decisions:` field, `fast-track-ai-index.sh`, `INDEX.md`, the managed AGENTS block, and live track `decisions.md` files that already have complete records.
 
 ## Constraints
-Use ADR as the canonical decision artifact while retaining `dot-ai/decisions/` as the canonical directory. Do not introduce an `adrs/` directory. A qualifying decision must be durable, costly to reverse, surprising without context, or the result of a meaningful trade-off; trivial wording, formatting, and easily reversible operational choices must not generate ADR noise. Once the user explicitly decides a qualifying matter, capture is mandatory rather than optional. Preserve a unique identifier and traceable lifecycle for every ADR. Frontmatter keys and structural values remain in English, and the Markdown template structure remains in English even when the user chooses another language for document content.
+Keep user-facing package prose in English. Stay inside the six-skill package. Do not create an `adrs/` directory. Do not give ADRs a `proposed` status. Do not edit accepted Decision text. Do not invent alternatives or rationale on promotion. Do not rewrite frozen `001` prose. Do not close `006`, `007`, `008`, or `009`. The AGENTS rule "a recorded decision is never relitigated" stays.
 
 ## Out of scope
-Writing ADRs for trivial preferences, resolving the findings of existing assessments, changing third-party ADR tools, and deciding unrelated architecture questions are outside this track.
+Writing ADRs for trivial preferences. Resolving findings in `2026-09-15-project-completeness.md` other than the missing decision standard. Changing third-party ADR tools. Unified spec (`008`). Track terminal states (`009`). Refs standard (`007`) beyond citing existing slugs. Filing the Obsidian ADR clipping as a ref (no file was handed over).
 
 ## Assumed state
-The Obsidian clipping `Guia Completo sobre Architecture Decision Records (ADR): Definição e Melhores Práticas`, by Jhony Walker, is an input source. It defines ADRs as structured records of architectural decisions and recommends consistent sections, unique numbering, traceability, versioning, rationale, alternatives, consequences, maintenance, and accessible sharing. `dot-ai/decisions/` is the retained canonical directory. Its document format and the track-level `decisions.md` structure are provisional and require migration into the approved ADR model.
+On 2026-09-18 track `005` shipped the empty directory `fast-track-ai/decisions/` and the thin template at `skills/fast-track-ai-plan/assets/decisions.md`. On 2026-09-19 the maintainer decided: ADRs are repository-wide with optional track cites; statuses are `accepted | superseded` only; accepted Decision text is immutable and a change is a new ADR; INDEX gets a third table; promote only records that already have context, decision, and consequence. The Obsidian clipping `Guia Completo sobre Architecture Decision Records (ADR): Definição e Melhores Práticas`, by Jhony Walker, remains a named input in this intent and is not yet a file under `fast-track-ai/refs/`.
 
 ## Open questions
-- Are ADRs repository-wide, track-owned, or repository-wide records referenced by tracks? Owner: maintainer.
-- Which statuses and transition rules govern an ADR? Owner: maintainer.
-- Are accepted ADRs immutable and superseded by new records, or may their decision text be edited? Owner: maintainer.
-- Should `dot-ai/INDEX.md` include an Architecture Decision Log? Owner: maintainer.
-- How should existing decisions and conversation-derived decisions be migrated without fabricating alternatives or rationale? Owner: maintainer.
+None.

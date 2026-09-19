@@ -1,8 +1,8 @@
 ---
 captured: YYYY-MM-DD
-status: open
 owner: maintainer
 scope: one-line scope
+tracks: []
 ---
 
 # Assessment: short title

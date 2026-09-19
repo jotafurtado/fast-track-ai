@@ -1,6 +1,5 @@
 ---
 captured: 2026-09-15
-status: open
 owner: maintainer
 scope: dot-ai method package
 ---

@@ -1,6 +1,6 @@
 ---
 id: 001-skill-standards
-status: active
+status: shipped
 research: []
 decisions: []
 ---

@@ -1,6 +1,6 @@
 ---
 id: 005-lightweight-sdlc
-status: active
+status: shipped
 research: []
 decisions: [001-spec-md-owner, 002-historical-spec-dir, 003-live-evals-vs-frozen-spec, 004-drop-vendored-speckit]
 ---

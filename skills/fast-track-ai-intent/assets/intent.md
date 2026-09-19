@@ -2,6 +2,7 @@
 id: NNN-slug
 status: draft
 research: []
+assessments: []
 decisions: []
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: 002-assessment-standard
-status: draft
+status: shipped
 research: []
 decisions: []
 ---
@@ -8,26 +8,28 @@ decisions: []
 # Intent: Assessment Standard
 
 ## Problem
-The method creates `dot-ai/assessments/` and exposes it through `.specify/assessments`, but no norm, domain definition, metadata contract, lifecycle, or responsible skill explains what an assessment is. The existing project-completeness report therefore uses a location and frontmatter that were inferred rather than governed.
+The method creates `fast-track-ai/assessments/` and ships a thin template (`captured`, `status`, `owner`, `scope`, Conclusion, Findings), but it does not define what an assessment is. There is no rule that distinguishes it from research or track `assets/`, no index presence, and no skill procedure that writes one. The only existing file, `fast-track-ai/assessments/2026-09-15-project-completeness.md`, therefore uses a location and frontmatter that were inferred rather than governed. The shipped template also carries a `status` field that the maintainer does not want.
 
 ## Proposed outcome
-The method has an explicit assessment standard that defines when an internal evaluation qualifies as an assessment, distinguishes it from research and track assets, gives it a canonical location and lifecycle, and makes its provenance and relationship to tracks unambiguous.
+An assessment is research pointed inward: an evaluation of this method or of a target repository, stored at `fast-track-ai/assessments/<date>-<slug>.md`. External factual investigation stays in `fast-track-ai/research/`. Track-specific auxiliary output stays under the track `assets/`.
+
+An assessment has no lifecycle `status`. It is raw input for a later intent. It is repository-wide and may optionally name one or more tracks.
+
+The package has a written standard for when a write is an assessment, required English frontmatter without `status`, and how assessments relate to tracks and intents. `fast-track-ai/INDEX.md` lists assessments in a second table. No seventh skill is added: `fast-track-ai-init` owns the template; any skill or the agent files from that template when the work is an internal evaluation.
+
+The existing completeness report is an input example, not the normative template. This track does not close its findings. It may drop `status` from that file so the example matches the standard.
 
 ## Users and systems
-Method maintainers create and review assessments. Coding agents must classify, store, discover, and update them consistently. The affected systems are the dot-ai knowledge tree, initialization, indexing, Spec Kit integration, skills, and the binding method norm.
+Method maintainers create assessments as inward research. Coding agents classify, store, discover, and cite them when drafting intents. Affected systems: `fast-track-ai/assessments/`, the init-owned template, `fast-track-ai-index.sh`, `INDEX.md`, the managed AGENTS block, the intent template's `research` field or an equivalent citation, and the six existing skills.
 
 ## Constraints
-Preserve the rule that external factual investigation belongs in `research/` and track-specific auxiliary output belongs under the track `assets/` unless the assessment standard establishes a stronger ownership rule. Do not legitimize the existing report format merely because it already exists. Keep the package portable and user-facing package prose in English.
+Do not give assessments a `status` field. Do not treat an assessment as a track or as an executable plan. Do not legitimize the completeness report format merely because it already exists. Keep user-facing package prose in English. Stay inside the six-skill package. Do not recreate `.specify/` or any Spec Kit view.
 
 ## Out of scope
-Resolving the findings inside the current completeness report, redesigning unrelated track states, and changing third-party Spec Kit behavior are outside this track.
+Resolving findings inside `2026-09-15-project-completeness.md`. The ADR standard (`004`). Adding `fast-track-ai-assess`. Changing Matt Pocock skills. Rewriting frozen `001` prose. Changing how `fast-track-ai-plan` asks open intent questions (that is a separate track).
 
 ## Assumed state
-`dot-ai/assessments/` and `.specify/assessments` are provisional structures without an approved semantic contract. `dot-ai/assessments/2026-09-15-project-completeness.md` is an input example, not a normative template.
+On 2026-09-18 track `005` shipped `fast-track-ai/assessments/` and the thin template at `skills/fast-track-ai-init/assets/assessment.md` with frontmatter `captured`, `status`, `owner`, `scope`. The index lists tracks only and does not validate assessment files. On 2026-09-19 the maintainer decided: assessments are repository-wide with optional track links; no new skill; INDEX gets a second table; an assessment is inward research with no status and exists as input for an intent.
 
 ## Open questions
-- Must every assessment belong to one track, or may repository-wide assessments exist? Owner: maintainer.
-- Which metadata and lifecycle states are required? Owner: maintainer.
-- Does assessment creation need a dedicated `dot-ai-assess` skill? Owner: maintainer.
-- Should assessments appear in `dot-ai/INDEX.md`? Owner: maintainer.
-- Should `.specify/assessments` remain a supported view? Owner: maintainer.
+None.

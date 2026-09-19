@@ -1,10 +1,23 @@
-# Decisions: NNN-slug
-
-## 001-short-title
-id: 001-short-title
+---
+id: NNN-slug
 status: accepted
 date: YYYY-MM-DD
 owner: maintainer
-Context: what was at stake.
-Decision: what was decided.
-Consequence: what changes from here on.
+---
+
+# ADR: NNN-slug
+
+## Context
+What was at stake.
+
+## Decision
+What was decided.
+
+## Rationale
+Why this option. Use None when it was never recorded.
+
+## Alternatives considered
+What was rejected. Use None when it was never recorded.
+
+## Consequences
+What changes from here on.
