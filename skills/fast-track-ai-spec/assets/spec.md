@@ -4,7 +4,7 @@ status: draft
 
 # Spec: NNN-slug
 
-Thin product description owned by this package. Not a Spec Kit artifact.
+Thin product description owned by this package.
 
 ## Outcome
 What is true when the track closes.

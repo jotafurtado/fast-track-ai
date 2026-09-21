@@ -15,10 +15,10 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | Selector | Observable Contract | Expected Exit | Result |
 |----------|---------------------|---------------|--------|
 | `self` | Runner and every published shell script pass `bash -n`; repository validation does not mask gate failures | 0 | PASS |
-| `init` | Empty target receives the canonical `fast-track-ai/` tree and one managed block; second run is idempotent; no `specs/` or `.specify/` is created | 0 | PASS |
+| `init` | Empty target receives the canonical `fast-track-ai/` tree and one managed block; second run is idempotent | 0 | PASS |
 | `index` | Valid fixtures appear in track, ref, research, assessment, decision, and active-handoff tables; archived handoffs are absent; invalid type-specific invariants fail; unchanged output is byte-identical | 0 | PASS |
 | `approval` | Draft intent with approved closed spec/tasks passes; leftover `plan.md`, unapproved spec/tasks, and open tasks fail | 0 | PASS |
-| `install` | Default and custom agents/Claude directories contain seven resolving `fast-track-ai-*` skill links and no `shared` link | 0 | PASS |
+| `install` | Default and custom agents/Claude directories contain seven resolving `fast-track-ai-*` skill links, seven command files, and no `shared` link | 0 | PASS |
 | `audit` | The frozen six-skill historical audit still contains exactly 36 evidence-backed skill-rule verdicts | 0 | PASS |
 | `resources` | Every owned script and template has exactly one owner guidance reference; removed init templates are absent | 0 | PASS |
 | `workflows` | Research, assessment, and handoff are self-contained, status-free where required, conform to their schemas, and respect source-license boundaries | 0 | PASS |
@@ -27,6 +27,7 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | `handoff` | A four-file fixture keeps the newest three active, archives the oldest, preserves exact instructions, and excludes archive from INDEX | 0 | PASS |
 | `spec` | Required track-root `spec.md` is enforced; `spec/` without `spec.md` fails; approved closed tracks with `spec.md` pass | 0 | PASS |
 | `contract` | Package contract records seven skills, owner paths, single template ownership, self-contained workflows, and deterministic artifact schemas | 0 | PASS |
+| `flow` | Intent, spec, and implement skills plus the tasks template contain continuous-flow next-step lines, the non-implementation exit, `## Group`, and `(depends:` | 0 | PASS |
 
 ## Behavioral Fixtures
 
@@ -57,4 +58,4 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 
 ## Recorded Run
 
-`run-evals.sh all` completed with all thirteen selectors passing on 2026-09-20.
+`run-evals.sh all` completed with all fourteen selectors passing on 2026-09-21.

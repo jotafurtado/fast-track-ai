@@ -426,6 +426,7 @@ run_approval() {
 assert_installed_layout() {
   agents_dir="$1"
   claude_dir="$2"
+  commands_dir="$3"
   count=0
   for skill in "$repo_root"/skills/fast-track-ai-*; do
     name="$(basename "$skill")"
@@ -436,18 +437,25 @@ assert_installed_layout() {
   [ "$count" -eq 7 ] || fail "expected 7 installed skills, got $count"
   [ ! -e "$agents_dir/shared" ] || fail "shared link was installed"
   [ ! -e "$claude_dir/shared" ] || fail "shared Claude mirror was installed"
+  cmd_count=0
+  for cmd in "$repo_root"/commands/fast-track-ai-*.md; do
+    name="$(basename "$cmd")"
+    [ -e "$commands_dir/$name" ] || fail "command does not resolve: $commands_dir/$name"
+    cmd_count=$((cmd_count + 1))
+  done
+  [ "$cmd_count" -eq 7 ] || fail "expected 7 installed commands, got $cmd_count"
 }
 
 run_install() {
   custom="$work/install-custom"
   mkdir -p "$custom/claude"
   "$repo_root/install.sh" --agents-dir "$custom/agents/skills" --claude-dir "$custom/claude/skills" >/dev/null
-  assert_installed_layout "$custom/agents/skills" "$custom/claude/skills"
+  assert_installed_layout "$custom/agents/skills" "$custom/claude/skills" "$custom/claude/commands"
 
   default="$work/install-default"
   mkdir -p "$default/home/.claude"
   HOME="$default/home" "$repo_root/install.sh" >/dev/null
-  assert_installed_layout "$default/home/.agents/skills" "$default/home/.claude/skills"
+  assert_installed_layout "$default/home/.agents/skills" "$default/home/.claude/skills" "$default/home/.claude/commands"
   pass "install"
 }
 
@@ -630,7 +638,7 @@ run_decisions() {
   assert_not_contains "$decision" 'superseded_by:'
   replacement="$work/replacement-target"
   "$init_script" "$replacement" >/dev/null
-  write_intent "$replacement" "001-replacement-fixture" "active"
+  write_intent "$replacement" "001-replacement-fixture" "draft"
   original_payload_hash="$(printf '%s' 'mutable payload v1' | shasum -a 256 | awk '{print $1}')"
   replacement_payload_hash="$(printf '%s' 'mutable payload v2' | shasum -a 256 | awk '{print $1}')"
   cat >"$replacement/fast-track-ai/refs/mutable-v1.md" <<EOF
@@ -746,19 +754,19 @@ run_handoff() {
 
 run_spec() {
   missing="$work/spec-missing"
-  write_intent "$missing" "001-example" "active"
+  write_intent "$missing" "001-example" "draft"
   write_tasks "$missing/fast-track-ai/tracks/001-example/tasks.md" "approved" "x"
   expect_failure "gate without spec.md" "$gate" --track 001-example --root "$missing"
 
   leftover="$work/spec-leftover-dir"
-  write_intent "$leftover" "002-example" "active"
+  write_intent "$leftover" "002-example" "draft"
   mkdir -p "$leftover/fast-track-ai/tracks/002-example/spec"
   printf '# Spec\n' >"$leftover/fast-track-ai/tracks/002-example/spec/spec.md"
   write_tasks "$leftover/fast-track-ai/tracks/002-example/spec/tasks.md" "approved" "x"
   expect_failure "gate with spec/ and no root spec.md" "$gate" --track 002-example --root "$leftover"
 
   ok="$work/spec-ok"
-  write_intent "$ok" "003-example" "active"
+  write_intent "$ok" "003-example" "draft"
   write_spec "$ok/fast-track-ai/tracks/003-example/spec.md" "approved"
   write_tasks "$ok/fast-track-ai/tracks/003-example/tasks.md" "approved" "x"
   "$gate" --track 003-example --root "$ok" >/dev/null
@@ -766,6 +774,20 @@ run_spec() {
   write_plan "$ok/fast-track-ai/tracks/003-example/plan.md" "approved"
   expect_failure "gate with leftover plan.md" "$gate" --track 003-example --root "$ok"
   pass "spec cycle"
+}
+
+run_flow() {
+  intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
+  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
+  implement_skill="$repo_root/skills/fast-track-ai-implement/SKILL.md"
+  tasks_template="$repo_root/skills/fast-track-ai-spec/assets/tasks.md"
+  assert_contains "$intent_skill" ". para continuar com a spec"
+  assert_contains "$spec_skill" ". para implementar"
+  assert_contains "$implement_skill" ". para ship"
+  assert_contains "$intent_skill" "Track concluida. Nenhuma implementacao necessaria."
+  assert_contains "$tasks_template" "## Group"
+  assert_contains "$tasks_template" "(depends:"
+  pass "flow"
 }
 
 run_contract() {
@@ -795,12 +817,13 @@ run_case() {
     handoff) run_handoff ;;
     spec) run_spec ;;
     contract) run_contract ;;
+    flow) run_flow ;;
     *) fail "unknown eval: $1" ;;
   esac
 }
 
 if [ "$mode" = "all" ]; then
-  for eval_name in self init index approval install audit resources workflows refs decisions handoff spec contract; do
+  for eval_name in self init index approval install audit resources workflows refs decisions handoff spec contract flow; do
     run_case "$eval_name"
   done
   pass "all evals"

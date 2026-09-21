@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
-# install.sh links the fast-track-ai skills into a harness skills directory.
-# Usage: install.sh [--agents-dir DIR] [--claude-dir DIR]
-# Defaults: ~/.agents/skills and ~/.claude/skills. Works on any machine.
+# install.sh links the fast-track-ai skills into a harness skills directory
+# and the command wrappers into a harness commands directory.
+# Usage: install.sh [--agents-dir DIR] [--claude-dir DIR] [--commands-dir DIR]
+# Defaults: ~/.agents/skills, ~/.claude/skills, ~/.claude/commands.
+# When --claude-dir is set and --commands-dir is omitted, commands default to
+# a sibling commands directory of that skills dir.
 set -euo pipefail
 
 method_root="$(cd "$(dirname "$0")" && pwd)"
 agents_dir="$HOME/.agents/skills"
 claude_dir="$HOME/.claude/skills"
+commands_dir=""
+claude_dir_set=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --agents-dir) agents_dir="${2:-}"; shift 2;;
-    --claude-dir) claude_dir="${2:-}"; shift 2;;
+    --claude-dir) claude_dir="${2:-}"; claude_dir_set=1; shift 2;;
+    --commands-dir) commands_dir="${2:-}"; shift 2;;
     *) echo "ERROR: unknown argument: $1" >&2; exit 1;;
   esac
 done
+
+if [ -z "$commands_dir" ]; then
+  if [ "$claude_dir_set" -eq 1 ]; then
+    commands_dir="$(dirname "$claude_dir")/commands"
+  else
+    commands_dir="$HOME/.claude/commands"
+  fi
+fi
 
 relpath() {
   local from_dir to result
@@ -51,3 +65,10 @@ if [ -d "$(dirname "$claude_dir")" ]; then
   done
   echo "claude mirrors updated in $claude_dir"
 fi
+
+mkdir -p "$commands_dir"
+for cmd in "$method_root"/commands/fast-track-ai-*.md; do
+  [ -f "$cmd" ] || continue
+  ln -sfn "$cmd" "$commands_dir/$(basename "$cmd")"
+  echo "linked $(basename "$cmd") -> $commands_dir"
+done

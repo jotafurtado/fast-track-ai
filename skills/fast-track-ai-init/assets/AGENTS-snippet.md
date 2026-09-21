@@ -4,7 +4,7 @@
 
 Active memory lives in `fast-track-ai/`. Always read `fast-track-ai/INDEX.md` first; never scan the whole tree for discovery. The generated index lists tracks, refs, research, assessments, decisions, and active handoffs.
 
-Mandatory flow, no exceptions: a new request becomes `intent.md` first. The `fast-track-ai-intent` skill drafts `intent.md` only. The `fast-track-ai-spec` skill drafts `spec.md` and `tasks.md`. Intent approval is not required before those files. No `spec.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`.
+A change that will be implemented starts as `intent.md`. The `fast-track-ai-intent` skill drafts `intent.md` only. The `fast-track-ai-spec` skill drafts `spec.md` and `tasks.md`. Intent approval is not required before those files. No `spec.md` and `tasks.md` with `status: approved` means no implementation. Research, assess, and handoff may stop after their artifact and index regeneration without drafting an intent. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`.
 
 Continuous flow: each skill ends with a four-bullet summary plus a next-step line. `.` (or an affirmative synonym such as "sim", "pode continuar", "yes", "continue") means "understood, proceed" and chains the next skill for the same track without typing a command; any other input is a new instruction to the current skill. `.` never changes intent `status`; intent stays `draft` until the implement ship sets `shipped`.
 
@@ -25,7 +25,7 @@ Explicit actions: use `fast-track-ai-research` for external investigation, `fast
 Automatic captures: intent captures a material user-supplied basis as a ref; intent, spec, and implementation capture qualifying accepted decisions as ADRs. Do not add separate ref or ADR commands.
 
 - Track root holds only `intent.md`, `spec.md`, `tasks.md`, `decisions.md`, plus `assets/`. Live tracks must not keep `plan.md`. A leftover `spec/` directory is historical and does not select a cycle. Loose files are forbidden. Auxiliary outputs go under `assets/`.
-- A track leaves `active` only by explicit maintainer command. `dropped` abandons the work; implementation is not required. `superseded` requires `superseded_by`. Do not invent `superseded_by`. Implement owns `shipped` and asks before writing it.
+- Intent stays `draft` until `shipped`, `dropped`, or `superseded`. `dropped` abandons the work; implementation is not required. `superseded` requires `superseded_by`. Do not invent `superseded_by`. Implement owns `shipped` and asks before writing it.
 - Each script and template has one owner skill. Cross-skill consumers reference the owner copy via package-relative sibling paths. No `shared` link.
 
 <!-- END MANAGED BLOCK: fast-track-ai -->

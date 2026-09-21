@@ -1,6 +1,6 @@
 ---
 id: 010-approval-ask-not-gate-fail
-status: draft
+status: shipped
 research: []
 assessments: []
 refs: []

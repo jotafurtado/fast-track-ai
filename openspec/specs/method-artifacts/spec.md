@@ -18,7 +18,7 @@ The method SHALL recognize refs, research, assessments, decisions, and handoffs 
 - **THEN** the method exposes research, assessment, and handoff as explicit actions while ref and decision capture occur within the workflows that consume them
 
 ### Requirement: Package workflows are self-contained
-The research, assessment, and handoff workflows SHALL execute using instructions and templates owned by the fast-track-ai package. They MUST NOT require a separately installed third-party skill at runtime.
+The research, assessment, and handoff workflows SHALL execute using instructions and templates owned by the fast-track-ai package. They MUST NOT require a separately installed third-party skill at runtime. The package installer SHALL link every `skills/fast-track-ai-*` directory into the harness skills dirs and SHALL link every `commands/fast-track-ai-*.md` file into the harness commands directory.
 
 #### Scenario: Base skills are absent
 - **WHEN** fast-track-ai is installed on a machine that has no third-party research, assessment, or handoff skill
@@ -27,6 +27,10 @@ The research, assessment, and handoff workflows SHALL execute using instructions
 #### Scenario: Seventh skill is installed
 - **WHEN** the package installer discovers package skills
 - **THEN** it installs `fast-track-ai-assess` alongside the existing six fast-track-ai skills and exposes its command
+
+#### Scenario: Command wrappers are installed
+- **WHEN** the package installer runs with default or custom directories
+- **THEN** all seven `fast-track-ai-*.md` command files resolve in the harness commands directory, and the install eval asserts those links
 
 ### Requirement: Research preserves traceable external findings
 A research action SHALL write one status-free file under `fast-track-ai/research/<slug>.md`. The artifact SHALL identify capture date and owner, state the question and conclusion, cite direct sources for material claims, distinguish facts from inference, report conflicting evidence and limitations, and label material claims that rely on one source or potentially stale evidence. Source records SHALL live in the body so one research artifact can cite multiple sources.
