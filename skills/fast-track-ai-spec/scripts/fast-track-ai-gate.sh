@@ -38,10 +38,13 @@ base="$root/fast-track-ai/tracks/$track"
 intent="$base/intent.md"
 [ -f "$intent" ] || { echo "FAIL: $track missing intent.md"; exit 1; }
 grep -q "^id:" "$intent" || { echo "FAIL: intent without id"; exit 1; }
-intent_status="$(frontmatter_field "$intent" status)"
-[ "$intent_status" = "active" ] || { echo "FAIL: intent status must be active, got ${intent_status:-missing}"; exit 1; }
 
-allowed="intent.md spec.md plan.md tasks.md decisions.md spec assets"
+if [ -e "$base/plan.md" ]; then
+  echo "FAIL: $track has plan.md; live tracks must not keep plan.md"
+  exit 1
+fi
+
+allowed="intent.md spec.md tasks.md decisions.md spec assets"
 offenders=""
 for entry in "$base"/*; do
   [ -e "$entry" ] || continue
@@ -55,15 +58,14 @@ done
 [ -z "$offenders" ] || { echo "FAIL: loose files outside assets/:$offenders"; exit 1; }
 
 spec="$base/spec.md"
-[ -f "$spec" ] || { echo "FAIL: $track missing spec.md"; exit 1; }
-
-plan="$base/plan.md"
 tasks="$base/tasks.md"
-require_approved "$plan" "plan.md"
-grep -q "Files:" "$plan" || { echo "FAIL: plan without Files:"; exit 1; }
-grep -q "Accept:" "$plan" || { echo "FAIL: plan without Accept:"; exit 1; }
-require_approved "$tasks" "tasks.md"
+[ -f "$spec" ] || { echo "FAIL: $track missing spec.md"; exit 1; }
+grep -q "Files:" "$spec" || { echo "FAIL: spec without Files:"; exit 1; }
+grep -q "Accept:" "$spec" || { echo "FAIL: spec without Accept:"; exit 1; }
+[ -f "$tasks" ] || { echo "FAIL: $track missing tasks.md"; exit 1; }
 grep -q "Files:" "$tasks" || { echo "FAIL: tasks without Files:"; exit 1; }
 grep -q "Validate:" "$tasks" || { echo "FAIL: tasks without Validate:"; exit 1; }
+require_approved "$spec" "spec.md"
+require_approved "$tasks" "tasks.md"
 require_closed_tasks "$tasks"
 echo "PASS: $track cycle intact"

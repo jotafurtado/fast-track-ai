@@ -1,6 +1,6 @@
 ---
 id: 008-unified-spec
-status: draft
+status: shipped
 research: []
 assessments: []
 refs: []

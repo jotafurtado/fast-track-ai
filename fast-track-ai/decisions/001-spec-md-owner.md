@@ -1,8 +1,9 @@
 ---
 id: 001-spec-md-owner
-status: accepted
+status: superseded
 date: 2026-09-18
 owner: maintainer
+superseded_by: 005-spec-skill-owns-spec
 ---
 
 # ADR: 001-spec-md-owner

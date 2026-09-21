@@ -1,8 +1,9 @@
 ---
 id: 002-historical-spec-dir
-status: accepted
+status: superseded
 date: 2026-09-18
 owner: maintainer
+superseded_by: 006-no-live-plan-md
 ---
 
 # ADR: 002-historical-spec-dir

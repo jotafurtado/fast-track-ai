@@ -1,0 +1,10 @@
+---
+name: fast-track-ai-spec
+description: Draft unified spec.md (Outcome plus Phases) and tasks.md for a track that has intent.md, then stop at approval. Use when the user says "make a spec", "plan this track", "spec this", or asks how to implement, before any implementation. Intent status may be draft.
+---
+
+1. Read `fast-track-ai/tracks/NNN-slug/intent.md` in the target repo. Intent `status: active` is not required. Copy unanswered items under `Open questions` into `spec.md` Phases and `tasks.md` as work to resolve. Do not invent answers.
+2. Write `fast-track-ai/tracks/NNN-slug/spec.md` from `./assets/spec.md` bundled in this skill. Outcome plus numbered Phases with observable Done, explicit Files, one-line Accept per phase, Out of scope repeated from the intent without widening. Do not write `plan.md`. Auxiliary outputs go under `assets/`, never loose at the track root. A leftover `spec/` directory does not select a cycle and is not a substitute for `spec.md`.
+3. Write `tasks.md` from `./assets/tasks.md` bundled in this skill: 1 item per step, each with Files and Validate. Include a task for each leftover open question copied from the intent. When the user makes a qualifying decision (durable, costly to reverse, surprising without context, or a meaningful trade-off), file `fast-track-ai/decisions/<NNN-slug>.md` from `./assets/decisions.md` without a separate request. Status is `accepted | superseded` only. File outputs point under `assets/`.
+4. Run `./scripts/fast-track-ai-gate.sh --track NNN-slug --root <target>` from this skill as an internal smoke test. Do not present a draft-status gate miss or an open-task count as user-facing failure. Report leftover `plan.md`, loose files, missing Files/Accept/Validate, and any other non-draft breakage.
+5. Tell the user that `spec.md` and `tasks.md` were written and ask for approval to implement. No approved spec and tasks, no implementation. After explicit approval, set frontmatter `status: approved` in both `spec.md` and `tasks.md`. Do not auto-approve.

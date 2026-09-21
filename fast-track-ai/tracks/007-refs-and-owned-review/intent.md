@@ -1,6 +1,6 @@
 ---
 id: 007-refs-and-owned-review
-status: draft
+status: shipped
 research: []
 assessments: []
 refs: [code-review-skill]
@@ -13,7 +13,7 @@ decisions: []
 `fast-track-ai/refs/` exists and the index requires `sha256` plus a 500 KB cap, but nothing says when a user-supplied source becomes a ref, what the file contains, or how an intent cites it. Track `004` only names an Obsidian clipping in Assumed state; the file was never stored. The implement skill then calls Matt Pocock `/code-review`, which expects `docs/agents/issue-tracker.md` and a user-supplied git fixed point. This package does not ship that layout, so the review step is skipped or faked.
 
 ## Proposed outcome
-A user-supplied source is filed under `fast-track-ai/refs/<slug>.md` when it is the basis for a track. Two kinds:
+A user-supplied source is filed under `fast-track-ai/refs/<slug>.md` when it is the basis for a track. Two types:
 
 - **inline**: the full durable text (for example an Obsidian Markdown note).
 - **pointer**: a short Markdown file that says where to find the content (URL, pin, hash). Used for live online sources.

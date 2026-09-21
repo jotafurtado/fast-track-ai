@@ -1,6 +1,6 @@
 ---
 id: 009-track-terminal-states
-status: draft
+status: shipped
 research: []
 assessments: [2026-09-15-project-completeness]
 refs: []

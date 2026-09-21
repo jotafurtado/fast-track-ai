@@ -17,7 +17,7 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | `self` | Runner and every published shell script pass `bash -n`; repository validation does not mask gate failures | 0 | PASS |
 | `init` | Empty target receives the canonical `fast-track-ai/` tree and one managed block; second run is idempotent; no `specs/` or `.specify/` is created | 0 | PASS |
 | `index` | Active track is indexed without a `via` column; invalid status is rejected | 0 | PASS |
-| `approval` | Draft intent, unapproved plan/tasks, and open tasks fail; approved closed tracks pass | 0 | PASS |
+| `approval` | Draft intent with approved closed spec/tasks passes; leftover `plan.md`, unapproved spec/tasks, and open tasks fail | 0 | PASS |
 | `install` | Default and custom agents/Claude directories contain six resolving `fast-track-ai-*` skill links and no `shared` link | 0 | PASS |
 | `audit` | Exactly 36 unique skill-rule verdicts contain evidence quotes | 0 | PASS |
 | `resources` | Every owned script and asset has explicit skill guidance | 0 | PASS |
@@ -42,13 +42,13 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 ### Approval Gate
 
 - Prompt: "Check if the track is done."
-- Approval selector: draft intent, draft plan, draft tasks, and open tasks each exit 1; an approved closed cycle with `spec.md` exits 0.
+- Approval selector: draft intent with approved closed spec+tasks and no `plan.md` exits 0; leftover `plan.md`, draft spec, draft tasks, and open tasks each exit 1.
 
 ### Spec Cycle
 
-- Prompt: "Approve this plan."
-- Required file: track-root `spec.md`.
-- Failure fixtures: approved plan/tasks without `spec.md` exit 1; a leftover `spec/` directory without root `spec.md` exits 1.
+- Prompt: "Approve this spec."
+- Required file: track-root `spec.md` with Files and Accept.
+- Failure fixtures: approved tasks without `spec.md` exit 1; a leftover `spec/` directory without root `spec.md` exits 1; leftover root `plan.md` exits 1.
 
 ## Recorded Run
 

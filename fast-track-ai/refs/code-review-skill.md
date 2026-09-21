@@ -1,5 +1,5 @@
 ---
-kind: pointer
+type: pointer
 source: https://github.com/awesome-skills/code-review-skill
 captured: 2026-09-19
 owner: maintainer

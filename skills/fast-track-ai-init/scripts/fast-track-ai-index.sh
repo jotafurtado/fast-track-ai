@@ -97,9 +97,15 @@ fi
 
 for ref in "$ai"/refs/*; do
   [ -f "$ref" ] || continue
+  name="$(basename "$ref")"
   size=$(wc -c < "$ref" | tr -d ' ')
-  [ "$size" -le 512000 ] || fail "$(basename "$ref") over 500 KB ($size bytes)"
-  grep -q "^sha256:" "$ref" || fail "$(basename "$ref") missing sha256 field"
+  [ "$size" -le 512000 ] || fail "$name over 500 KB ($size bytes)"
+  grep -q "^sha256:" "$ref" || fail "$name missing sha256 field"
+  ref_type="$(field "$ref" type || true)"
+  case "$ref_type" in
+    inline|pointer) ;;
+    *) fail "$name invalid type: ${ref_type:-missing}";;
+  esac
 done
 
 for res in "$ai"/research/*.md; do
