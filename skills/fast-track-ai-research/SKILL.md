@@ -1,9 +1,11 @@
 ---
 name: fast-track-ai-research
-description: Research with the base research skill and file under fast-track-ai/research with valid frontmatter. Use when the user says "research X", "investigate", "gather docs", or needs facts before deciding.
+description: Investigate external facts using multiple traceable sources and save status-free research under fast-track-ai/research. Use when the user says "research X", "investigate", "gather docs", or needs external facts before deciding.
 ---
 
-1. Run the base `research` skill on the topic, using primary sources with citations.
-2. Save the result to `fast-track-ai/research/<slug>.md` in the target repo, nowhere else.
-3. Ensure the frontmatter: `source`, `captured`, `status: raw`, `owner`.
-4. Run `../fast-track-ai-init/scripts/fast-track-ai-index.sh <target>` (owner copy) and report validation errors.
+1. Read `fast-track-ai/INDEX.md` first. State the research question and the acceptance boundary before gathering evidence.
+2. Prefer primary sources. Retrieve and read the source itself rather than relying on search-result snippets. Use more than one independent source for a material conclusion when available.
+3. Tie every material claim to a direct citation. Distinguish observed facts from inference. Label claims that depend on one source or potentially stale evidence.
+4. Report credible disagreement under `Conflicts`. Report inaccessible material, freshness concerns, single-source dependence, inference, and other uncertainty under `Limitations`.
+5. Write exactly one result to `fast-track-ai/research/<slug>.md` from `./assets/research.md`. Use a descriptive kebab-case slug. Frontmatter contains `captured` and `owner` only; source records belong in the body so the artifact can cite multiple sources. Do not add a lifecycle `status` or singular `source` field.
+6. Run `../fast-track-ai-init/scripts/fast-track-ai-index.sh <target>` using the owner copy and report any validation error. Stop after the research artifact and regenerated index unless the user separately requests an intent.

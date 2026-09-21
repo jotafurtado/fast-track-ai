@@ -2,6 +2,8 @@
 captured: 2026-09-15
 owner: maintainer
 scope: dot-ai method package
+evaluator: original assessment agent (provider/model not recorded)
+tracks: []
 ---
 
 # Project Completeness Assessment
@@ -10,7 +12,22 @@ scope: dot-ai method package
 
 The project is not complete enough to declare version 1.0. The short cycle works on its nominal path, but the complete Spec Kit cycle, structural gates, installation portability, and regression evidence still have blocking gaps.
 
-## Verified Strengths
+## Scope and basis
+
+The assessment evaluated the repository-owned method package, its six installed skills, shell scripts, templates, structural gates, installer behavior, and executable evidence available on 2026-09-15. It excluded the unreadable binding Obsidian norm and did not implement the findings except for the initializer conflict fix recorded below.
+
+## Criteria
+
+- Published scripts are syntactically valid and executable.
+- Installation and initialization are portable and idempotent.
+- Planning approval and lifecycle state are durable and reconstructable.
+- Structural gates reject invalid track states.
+- Package contracts, ownership, and installed dependencies agree.
+- Regression evidence is executable and repeatable.
+
+## Findings
+
+### Verified Strengths
 
 - All published shell scripts pass `bash -n` and are executable.
 - The installer links all six skills into a custom agents directory.
@@ -21,7 +38,7 @@ The project is not complete enough to declare version 1.0. The short cycle works
 - The short-cycle gate fails on open tasks and passes after completion.
 - Initialization now rejects a conflicting `specs` path before changing the target.
 
-## Critical Findings
+### Critical Findings
 
 ### Complete Cycle Does Not Reach the Track Spec
 
@@ -35,7 +52,7 @@ The gate checks that an intent contains a `status` field but does not require `s
 
 The implementation skill requires approved plan and task artifacts, but the templates contain no approval state or marker. Approval therefore depends on conversational context and cannot be reconstructed reliably in a later session.
 
-## High-Priority Findings
+### High-Priority Findings
 
 ### Custom Claude Installation Produces Broken Links
 
@@ -53,7 +70,7 @@ The audit records aggregate statements such as `PASS all 6` instead of one verdi
 
 The eval document records past results in prose. It does not provide executable prompts, assertions, with-skill runs, baselines, or persisted benchmark output as described by the current skill-creator workflow.
 
-## Medium-Priority Findings
+### Medium-Priority Findings
 
 - The index accepts an invalid `via` value instead of enforcing `rapida | completa`.
 - Research validation checks only `owner`, not `source`, `captured`, and `status: raw`.
@@ -65,7 +82,7 @@ The eval document records past results in prose. It does not provide executable 
 - External base-skill dependencies are neither declared nor checked by the installer.
 - Slash command wrappers are part of the declared package map but are not installed by `install.sh`.
 
-## Resolved During This Assessment
+### Resolved During This Assessment
 
 The initializer previously returned success when a real `specs/` directory already existed, then created a separate `dot-ai/specs/` root. It now performs a preflight before any target write:
 
@@ -75,7 +92,11 @@ The initializer previously returned success when a real `specs/` directory alrea
 - conflicting content remains unchanged;
 - no `dot-ai/` tree or AGENTS block is created on failure.
 
-## Completion Criteria
+## Evidence against conclusion
+
+The nominal short cycle worked, all published shell scripts passed syntax checks, custom agents installation resolved its skill links, initialization was idempotent, the managed block remained singular, the index rendered an active track, and the short-cycle gate distinguished open from completed tasks. The initializer conflict behavior was also corrected during the assessment. These strengths reduce local risk but do not remove the blocking complete-cycle, durable-approval, portability, and regression-evidence gaps supporting the conclusion.
+
+## Recommendations
 
 1. Route the complete cycle from active intent to the canonical track spec.
 2. Validate active status, durable approval, and open full-cycle tasks in the gate.
@@ -87,6 +108,6 @@ The initializer previously returned success when a real `specs/` directory alrea
 8. Define assessment and terminal track-state workflows.
 9. Re-run the full clean, conflict, short-cycle, and complete-cycle scenarios in `/tmp`.
 
-## Scope Limitation
+## Limitations
 
 The binding Obsidian norm referenced by `AGENTS.md` was not readable during this assessment because the operating system denied access. This does not change the conclusion because the repository's own contracts already contain reproducible failures.

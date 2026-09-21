@@ -4,12 +4,12 @@ Method `fast-track-ai`, a lightweight agent-driven SDLC. Binding norm lives in O
 
 ## Map
 
-- `commands/` - slash commands, 1 file per command (`fast-track-ai-init`, `fast-track-ai-intent`, `fast-track-ai-spec`, `fast-track-ai-implement`, `fast-track-ai-research`, `fast-track-ai-handoff`)
+- `commands/` - slash commands, 1 file per command (`fast-track-ai-init`, `fast-track-ai-intent`, `fast-track-ai-spec`, `fast-track-ai-implement`, `fast-track-ai-research`, `fast-track-ai-assess`, `fast-track-ai-handoff`)
 - `skills/fast-track-ai-*/SKILL.md` - procedure each command runs
-- `skills/fast-track-ai-init/` - SKILL.md plus `scripts/` (`fast-track-ai-init.sh`, `fast-track-ai-index.sh`) plus `assets/` (`AGENTS-snippet.md`, `assessment.md`, `refs.md`)
-- `skills/fast-track-ai-intent/` - SKILL.md plus `assets/` (`intent.md`)
-- `skills/fast-track-ai-spec/` - SKILL.md plus `scripts/` (`fast-track-ai-gate.sh`) plus `assets/` (`spec.md`, `tasks.md`, `decisions.md`)
-- `skills/fast-track-ai-implement/`, `fast-track-ai-research/`, `fast-track-ai-handoff/` - SKILL.md only, referencing owner copies
+- `skills/fast-track-ai-init/` - SKILL.md plus `scripts/` (`fast-track-ai-init.sh`, `fast-track-ai-index.sh`) plus `assets/AGENTS-snippet.md`
+- `skills/fast-track-ai-intent/` - SKILL.md plus `assets/` (`intent.md`, `ref.md`)
+- `skills/fast-track-ai-spec/` - SKILL.md plus `scripts/fast-track-ai-gate.sh` plus `assets/` (`spec.md`, `tasks.md`, `decisions.md`)
+- `skills/fast-track-ai-assess/`, `skills/fast-track-ai-research/`, and `skills/fast-track-ai-handoff/` - each owns its SKILL.md and artifact template; `skills/fast-track-ai-implement/` owns SKILL.md only
 
 Skills run against the target repo `fast-track-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `fast-track-ai-init` installs anything, through its own script path.
 
@@ -36,16 +36,24 @@ Skills run against the target repo `fast-track-ai/` tree using scripts and templ
 
 ## fast-track-ai
 
-Active memory in `fast-track-ai/`. Read `fast-track-ai/INDEX.md` first, never scan the whole tree.
+Active memory lives in `fast-track-ai/`. Always read `fast-track-ai/INDEX.md` first; never scan the whole tree for discovery. The generated index lists tracks, refs, research, assessments, decisions, and active handoffs.
 
 Mandatory flow, no exceptions: a new request becomes `intent.md` first. The `fast-track-ai-intent` skill drafts `intent.md` only. The `fast-track-ai-spec` skill drafts `spec.md` and `tasks.md`. Intent approval is not required before those files. No `spec.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`.
 
-- Assessments live in `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md`. They are inward research with no status and are input for a later intent. Cite them on an intent in `assessments:`, not in `research:`. External research stays in `fast-track-ai/research/`.
-- Valid handoff: only the 3 most recent in `fast-track-ai/handoffs/`. Ignore `archive/`.
+Supporting artifact contracts:
+
+- A ref preserves an immutable source input at `fast-track-ai/refs/<slug>.md`. It is `inline` or `pointer`, records content identity and license, and is cited on an intent in `refs:`. Changed source bytes require a new ref.
+- Research investigates external facts at `fast-track-ai/research/<slug>.md`. It is status-free, multi-source, and cited on an intent in `research:`.
+- An assessment evaluates the project, implementation, feature, or idea at `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md`. It is status-free, records evaluator plus evidence and counterevidence, and is cited on an intent in `assessments:`, never `research:`.
+- A decision preserves a qualifying accepted durable choice at `fast-track-ai/decisions/<NNN-slug>.md`. It uses only `accepted` or `superseded` and is cited on an intent in `decisions:`.
+- A handoff transfers active working context at `fast-track-ai/handoffs/<timestamp>-<slug>.md`. Keep the three newest active files and move older files to `handoffs/archive/`; archived handoffs are not active index entries.
+
+Explicit actions: use `fast-track-ai-research` for external investigation, `fast-track-ai-assess` for inward evaluation, and `fast-track-ai-handoff` for context transfer. Each action writes directly from its package-owned template without a third-party runtime skill.
+
+Automatic captures: intent captures a material user-supplied basis as a ref; intent, spec, and implementation capture qualifying accepted decisions as ADRs. Do not add separate ref or ADR commands.
+
 - Track root holds only `intent.md`, `spec.md`, `tasks.md`, `decisions.md`, plus `assets/`. Live tracks must not keep `plan.md`. A leftover `spec/` directory is historical and does not select a cycle. Loose files are forbidden. Auxiliary outputs go under `assets/`.
-- `refs/` is immutable. Source changed, new file. File a basis source at `fast-track-ai/refs/<slug>.md` as `type: inline` or `type: pointer`. Cite the slug on an intent in `refs:`.
 - A track leaves `active` only by explicit maintainer command. `dropped` abandons the work; implementation is not required. `superseded` requires `superseded_by`. Do not invent `superseded_by`. Implement owns `shipped` and asks before writing it.
-- Architecture Decision Records live in `fast-track-ai/decisions/<NNN-slug>.md`. Cite them on an intent in `decisions:`. A recorded Decision is never relitigated.
 - Each script and template has one owner skill. Cross-skill consumers reference the owner copy via package-relative sibling paths. No `shared` link.
 
 <!-- END MANAGED BLOCK: fast-track-ai -->

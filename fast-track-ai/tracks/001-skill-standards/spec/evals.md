@@ -1,6 +1,6 @@
 # Evals: Skill Standards Compliance
 
-**Date**: 2026-09-18
+**Date**: 2026-09-20
 
 ## Executable Runner
 
@@ -16,13 +16,17 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 |----------|---------------------|---------------|--------|
 | `self` | Runner and every published shell script pass `bash -n`; repository validation does not mask gate failures | 0 | PASS |
 | `init` | Empty target receives the canonical `fast-track-ai/` tree and one managed block; second run is idempotent; no `specs/` or `.specify/` is created | 0 | PASS |
-| `index` | Active track is indexed without a `via` column; invalid status is rejected | 0 | PASS |
+| `index` | Valid fixtures appear in track, ref, research, assessment, decision, and active-handoff tables; archived handoffs are absent; invalid type-specific invariants fail; unchanged output is byte-identical | 0 | PASS |
 | `approval` | Draft intent with approved closed spec/tasks passes; leftover `plan.md`, unapproved spec/tasks, and open tasks fail | 0 | PASS |
-| `install` | Default and custom agents/Claude directories contain six resolving `fast-track-ai-*` skill links and no `shared` link | 0 | PASS |
-| `audit` | Exactly 36 unique skill-rule verdicts contain evidence quotes | 0 | PASS |
-| `resources` | Every owned script and asset has explicit skill guidance | 0 | PASS |
+| `install` | Default and custom agents/Claude directories contain seven resolving `fast-track-ai-*` skill links and no `shared` link | 0 | PASS |
+| `audit` | The frozen six-skill historical audit still contains exactly 36 evidence-backed skill-rule verdicts | 0 | PASS |
+| `resources` | Every owned script and template has exactly one owner guidance reference; removed init templates are absent | 0 | PASS |
+| `workflows` | Research, assessment, and handoff are self-contained, status-free where required, conform to their schemas, and respect source-license boundaries | 0 | PASS |
+| `refs` | Ref instructions cover inline, pinned pointer, mutable pointer replacement, candidate-hash reuse, persisted duplicate rejection, locator hashes, and unavailable sources | 0 | PASS |
+| `decisions` | Intent distinguishes qualifying from local choices; evidence citations, material planning-drift approval rules, immutable original ADR content, and `superseded_by` replacement are covered | 0 | PASS |
+| `handoff` | A four-file fixture keeps the newest three active, archives the oldest, preserves exact instructions, and excludes archive from INDEX | 0 | PASS |
 | `spec` | Required track-root `spec.md` is enforced; `spec/` without `spec.md` fails; approved closed tracks with `spec.md` pass | 0 | PASS |
-| `contract` | Package path contract permits sibling owner paths and rejects machine-fixed paths | 0 | PASS |
+| `contract` | Package contract records seven skills, owner paths, single template ownership, self-contained workflows, and deterministic artifact schemas | 0 | PASS |
 
 ## Behavioral Fixtures
 
@@ -36,8 +40,9 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 ### Index
 
 - Prompt: "Regenerate the index."
-- Expected row: `| 001-example | active |`.
-- Failure fixture: unsupported intent status exits 1 with an objective error.
+- Expected tables: tracks, refs, research, assessments, decisions, and active handoffs.
+- Valid fixtures: inline ref, pinned pointer, mutable pointer and replacement, candidate hash matching an existing slug without a duplicate file, multi-source research, assessment, accepted decision, superseded decision with replacement, and active handoff.
+- Determinism: two unchanged runs produce byte-identical `INDEX.md`; archived handoffs are absent.
 
 ### Approval Gate
 
@@ -52,4 +57,4 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 
 ## Recorded Run
 
-`run-evals.sh all` completed with all nine selectors passing on 2026-09-18.
+`run-evals.sh all` completed with all thirteen selectors passing on 2026-09-20.

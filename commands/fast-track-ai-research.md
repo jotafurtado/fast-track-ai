@@ -1,5 +1,5 @@
 ---
-description: Research a topic with the base research skill and save to fast-track-ai/research/.
+description: Research external facts with traceable sources and save status-free findings to fast-track-ai/research/.
 ---
 
-Run the `fast-track-ai-research` skill. Topic comes from the arguments. Final file always goes to `fast-track-ai/research/<slug>.md` with `source`, `captured`, `status`, `owner` frontmatter.
+Run the `fast-track-ai-research` skill. The topic comes from the arguments. The skill performs the research directly without an external runtime skill. The final file goes to `fast-track-ai/research/<slug>.md`, records `captured` and `owner`, cites sources in the body, and includes conflicts and limitations.
