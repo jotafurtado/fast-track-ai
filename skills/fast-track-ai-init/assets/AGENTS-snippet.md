@@ -6,6 +6,12 @@ Active memory lives in `fast-track-ai/`. Always read `fast-track-ai/INDEX.md` fi
 
 Mandatory flow, no exceptions: a new request becomes `intent.md` first. The `fast-track-ai-intent` skill drafts `intent.md` only. The `fast-track-ai-spec` skill drafts `spec.md` and `tasks.md`. Intent approval is not required before those files. No `spec.md` and `tasks.md` with `status: approved` means no implementation. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`.
 
+Continuous flow: each skill ends with a four-bullet summary plus a next-step line. `.` (or an affirmative synonym such as "sim", "pode continuar", "yes", "continue") means "understood, proceed" and chains the next skill for the same track without typing a command; any other input is a new instruction to the current skill. `.` never changes intent `status`; intent stays `draft` until the implement ship sets `shipped`.
+
+Intent autonomy: the intent skill asks up to three focused interactive questions when the request is vague, and autonomously generates supporting artifacts when explicit triggers fire (research for unknown tech, ref for user-supplied URL, ADR for a qualifying answer, assessment for an evaluation request), informing in one sentence before each without asking permission. Purely investigative or evaluative requests exit cleanly with their artifact and no spec prompt.
+
+Tasks parallelism: `tasks.md` organizes tasks under `## Group <name>` headers with `(depends: <group>)` on dependent group headers. Tasks in one group run concurrently; groups run in dependency order. The implement skill resolves these annotations and requests an execution-class agent from the harness for task subagents.
+
 Supporting artifact contracts:
 
 - A ref preserves an immutable source input at `fast-track-ai/refs/<slug>.md`. It is `inline` or `pointer`, records content identity and license, and is cited on an intent in `refs:`. Changed source bytes require a new ref.
