@@ -13,6 +13,7 @@ Thumbs.db
 
 # Harness local state
 .omp/
+.cursor/
 
 # Spec Kit runtime (project config already tracked stays tracked)
 .specify/
