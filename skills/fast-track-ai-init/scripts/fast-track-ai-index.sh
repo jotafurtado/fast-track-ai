@@ -18,7 +18,60 @@ handoff_rows=""
 fail() { echo "ERROR: $1" >&2; errors=$((errors + 1)); }
 
 field() {
-  awk '/^---$/{c++; next} c==1' "$1" | grep -E "^$2:" | head -n 1 | sed -E "s/^$2:[[:space:]]*//"
+  awk -v key="$2" '/^---$/{c++; next} c==1 && index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
+}
+
+validate_flow_list() {
+  local file="$1"
+  local key="$2"
+  local category="$3"
+  local value="${4:-}"
+  local list slug target
+  local -a slugs
+  [ -z "$value" ] && return
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ ! "$value" =~ ^\[[^][]*\]$ ]]; then
+    fail "$(basename "$file") $key must use [a, b] list form"
+    return
+  fi
+  list="${value:1:${#value}-2}"
+  [ -z "${list//[[:space:]]/}" ] && return
+  IFS=',' read -r -a slugs <<< "$list"
+  for slug in "${slugs[@]}"; do
+    slug="${slug#"${slug%%[![:space:]]*}"}"
+    slug="${slug%"${slug##*[![:space:]]}"}"
+    if [ -z "$slug" ]; then
+      fail "$(basename "$file") $key contains an empty slug"
+      continue
+    fi
+    target="$ai/$category/$slug.md"
+    [ -f "$target" ] || fail "$(basename "$file") $key references missing $slug"
+  done
+}
+
+validate_superseded() {
+  local file="$1"
+  local category="$2"
+  local id="$3"
+  local required="$4"
+  local replacement
+  local target
+  replacement="$(field "$file" superseded_by || true)"
+  if [ -z "$replacement" ]; then
+    if [ "$required" = "yes" ]; then fail "$(basename "$file") superseded without superseded_by"; fi
+    return 0
+  fi
+  if [ "$replacement" = "$id" ]; then
+    fail "$(basename "$file") superseded_by has a self-reference: $replacement"
+    return
+  fi
+  if [ "$category" = "tracks" ]; then
+    target="$ai/tracks/$replacement/intent.md"
+  else
+    target="$ai/$category/$replacement.md"
+  fi
+  [ -f "$target" ] || fail "$(basename "$file") superseded_by references missing $replacement"
 }
 
 require_heading() {
@@ -39,9 +92,12 @@ sha256_text() {
 
 inline_source_hash() {
   awk '
-    found && !started && $0 == "" { started=1; next }
-    found && started { sub(/\r$/, ""); print }
-    /^## Source content$/ { found=1 }
+    /^## Source content$/ { found=1; next }
+    found && !separator_checked {
+      separator_checked=1
+      if ($0 == "") next
+    }
+    found { sub(/\r$/, ""); print }
   ' "$1" | shasum -a 256 | awk '{print $1}'
 }
 
@@ -49,6 +105,14 @@ if [ ! -d "$ai/tracks" ]; then
   echo "ERROR: $ai/tracks missing. Run fast-track-ai-init.sh first." >&2
   exit 1
 fi
+
+tmp_index="$(mktemp "$ai/.INDEX.md.XXXXXX")"
+trap 'rm -f "$tmp_index"' EXIT
+
+for track_dir in "$ai"/tracks/*/; do
+  [ -d "$track_dir" ] || continue
+  [ -f "$track_dir/intent.md" ] || fail "$(basename "$track_dir") missing intent.md"
+done
 
 for intent in "$ai"/tracks/*/intent.md; do
   [ -f "$intent" ] || continue
@@ -60,10 +124,10 @@ for intent in "$ai"/tracks/*/intent.md; do
   [ -n "$status" ] || { fail "$track missing status field"; continue; }
   [ "$id" = "$track" ] || fail "$track id mismatch: $id"
   case "$status" in draft|active|shipped|dropped|superseded) ;; *) fail "$track invalid status: $status";; esac
-  if [ "$status" = "superseded" ]; then
-    superseded_by="$(field "$intent" superseded_by || true)"
-    [ -n "$superseded_by" ] || fail "$track superseded without superseded_by"
-  fi
+  for category in refs research assessments decisions; do
+    validate_flow_list "$intent" "$category" "$category" "$(field "$intent" "$category" || true)"
+  done
+  validate_superseded "$intent" tracks "$id" "$([ "$status" = "superseded" ] && echo yes || echo no)"
   track_rows="$track_rows| $track | $status |"$'\n'
 done
 
@@ -204,10 +268,7 @@ if [ -d "$ai/decisions" ]; then
       accepted|superseded) ;;
       *) fail "$name invalid status: ${status:-missing}";;
     esac
-    if [ "$status" = "superseded" ]; then
-      superseded_by="$(field "$decision" superseded_by || true)"
-      [ -n "$superseded_by" ] || fail "$name superseded without superseded_by"
-    fi
+    validate_superseded "$decision" decisions "$stem" "$([ "$status" = "superseded" ] && echo yes || echo no)"
     require_heading "$decision" "## Context"
     require_heading "$decision" "## Decision"
     require_heading "$decision" "## Rationale"
@@ -217,18 +278,59 @@ if [ -d "$ai/decisions" ]; then
   done
 fi
 
+captured_epoch() {
+  awk -v value="$1" 'BEGIN {
+    year=substr(value,1,4)+0
+    month=substr(value,6,2)+0
+    day=substr(value,9,2)+0
+    hour=substr(value,12,2)+0
+    minute=substr(value,15,2)+0
+    second=substr(value,18,2)+0
+    month_adjusted=month+(month>2 ? -3 : 9)
+    year_adjusted=year-(month<=2)
+    era=int(year_adjusted/400)
+    year_of_era=year_adjusted-era*400
+    day_of_year=int((153*month_adjusted+2)/5)+day-1
+    day_of_era=year_of_era*365+int(year_of_era/4)-int(year_of_era/100)+day_of_year
+    days=era*146097+day_of_era-719468
+    offset=0
+    zone=substr(value,20)
+    if (zone != "Z") {
+      offset=(substr(zone,2,2)*3600)+(substr(zone,5,2)*60)
+      if (substr(zone,1,1) == "-") offset=-offset
+    }
+    print days*86400+hour*3600+minute*60+second-offset
+  }'
+}
+
+handoff_sort_rows=()
+active_handoffs=0
 if [ -d "$ai/handoffs" ]; then
   for handoff in "$ai"/handoffs/*; do
     [ -f "$handoff" ] || continue
+    active_handoffs=$((active_handoffs + 1))
     name="$(basename "$handoff")"
     stem="${name%.md}"
     captured="$(field "$handoff" captured || true)"
     owner="$(field "$handoff" owner || true)"
     focus="$(field "$handoff" focus || true)"
     status="$(field "$handoff" status || true)"
-
-    [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}-(Z|[+-][0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]] || fail "$name invalid handoff filename; expected YYYY-MM-DD-HHmm-OFFSET-slug.md"
-    [[ "$captured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]] || fail "$name invalid captured timestamp"
+    new_format=0
+    if [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}Z-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
+      new_format=1
+    elif [[ ! "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}-(Z|[+-][0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
+      fail "$name invalid handoff filename; expected YYYY-MM-DD-HHmmssZ-slug.md or legacy YYYY-MM-DD-HHmm-OFFSET-slug.md"
+    fi
+    if [[ ! "$captured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+      fail "$name invalid captured timestamp"
+      epoch=0
+    else
+      epoch="$(captured_epoch "$captured")"
+    fi
+    if [ "$new_format" = "1" ]; then
+      filename_instant="${stem:0:10}T${stem:11:2}:${stem:13:2}:${stem:15:2}Z"
+      [ "$captured" = "$filename_instant" ] || fail "$name filename timestamp does not match captured $captured"
+    fi
     [ -n "$owner" ] || fail "$name missing owner field"
     [ -n "$focus" ] || fail "$name missing focus field"
     [ -z "$status" ] || fail "$name must not have a status field"
@@ -243,8 +345,14 @@ if [ -d "$ai/handoffs" ]; then
     require_heading "$handoff" "## Observed command results"
     require_heading "$handoff" "## Blockers and risks"
     require_heading "$handoff" "## First next action"
-    handoff_rows="$handoff_rows| $stem | $captured |"$'\n'
+    handoff_sort_rows+=("$epoch"$'\t'"$name"$'\t'"$captured")
   done
+fi
+[ "$active_handoffs" -le 3 ] || fail "more than three handoffs are active"
+if [ "${#handoff_sort_rows[@]}" -gt 0 ]; then
+  while IFS=$'\t' read -r epoch name captured; do
+    handoff_rows="$handoff_rows| ${name%.md} | $captured |"$'\n'
+  done < <(printf '%s\n' "${handoff_sort_rows[@]}" | sort -t $'\t' -k1,1n -k2,2)
 fi
 
 {
@@ -255,11 +363,12 @@ fi
   printf '\n| assessment | captured |\n|---|---|\n%s' "$assessment_rows"
   printf '\n| decision | status |\n|---|---|\n%s' "$decision_rows"
   printf '\n| handoff | captured |\n|---|---|\n%s' "$handoff_rows"
-} > "$ai/INDEX.md"
+} > "$tmp_index"
 
 if [ "$errors" -gt 0 ]; then
-  echo "INDEX generated with $errors error(s)." >&2
+  echo "INDEX not updated: $errors error(s)." >&2
   exit 1
 fi
 
+mv "$tmp_index" "$ai/INDEX.md"
 echo "INDEX ok at $ai/INDEX.md"

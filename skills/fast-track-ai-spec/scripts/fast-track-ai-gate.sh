@@ -1,43 +1,51 @@
 #!/usr/bin/env bash
-# fast-track-ai-gate.sh is the structural gate of a track. PASS only with intact, approved, completed artifacts.
-# Usage: fast-track-ai-gate.sh --track NNN-slug [--root DIR]
+# fast-track-ai-gate.sh validates track structure and, in completion mode, approval and task closure.
+# Usage: fast-track-ai-gate.sh --track NNN-slug [--root DIR] [--mode structure|completion]
 set -euo pipefail
 
 track=""
 root="."
+mode="completion"
 while [ $# -gt 0 ]; do
   case "$1" in
     --track) track="${2:-}"; shift 2;;
     --root) root="${2:-.}"; shift 2;;
+    --mode) mode="${2:-}"; shift 2;;
     *) echo "FAIL: unknown argument: $1"; exit 1;;
   esac
 done
 [ -n "$track" ] || { echo "FAIL: pass --track NNN-slug"; exit 1; }
+case "$mode" in
+  structure|completion) ;;
+  *) echo "FAIL: unknown mode '$mode'; accepted modes are structure and completion"; exit 1;;
+esac
 
 frontmatter_field() {
-  awk '/^---$/{section++; next} section==1' "$1" |
-    sed -n -E "s/^$2:[[:space:]]*//p" |
-    head -n 1
+  awk -v key="$2" '/^---$/{section++; next} section==1 && index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
 }
 
 require_approved() {
-  file="$1"
-  label="$2"
+  local file="$1"
+  local label="$2"
   [ -f "$file" ] || { echo "FAIL: $track missing $label"; exit 1; }
+  local status
   status="$(frontmatter_field "$file" status)"
   [ "$status" = "approved" ] || { echo "FAIL: $label status must be approved, got ${status:-missing}"; exit 1; }
 }
 
 require_closed_tasks() {
-  file="$1"
-  open="$(grep -c -- "^- \[ \]" "$file" || true)"
+  local file="$1"
+  local open
+  open="$(grep -c -- "^- \[ \] " "$file" || true)"
   [ "$open" = "0" ] || { echo "FAIL: $open open task(s) in ${file#"$root"/}"; exit 1; }
 }
 
 base="$root/fast-track-ai/tracks/$track"
 intent="$base/intent.md"
 [ -f "$intent" ] || { echo "FAIL: $track missing intent.md"; exit 1; }
-grep -q "^id:" "$intent" || { echo "FAIL: intent without id"; exit 1; }
+id="$(frontmatter_field "$intent" id)"
+[ -n "$id" ] || { echo "FAIL: intent without id"; exit 1; }
+[ "$id" = "$track" ] || { echo "FAIL: intent id mismatch: $id (expected $track)"; exit 1; }
 
 if [ -e "$base/plan.md" ]; then
   echo "FAIL: $track has plan.md; live tracks must not keep plan.md"
@@ -60,12 +68,121 @@ done
 spec="$base/spec.md"
 tasks="$base/tasks.md"
 [ -f "$spec" ] || { echo "FAIL: $track missing spec.md"; exit 1; }
-grep -q "Files:" "$spec" || { echo "FAIL: spec without Files:"; exit 1; }
-grep -q "Accept:" "$spec" || { echo "FAIL: spec without Accept:"; exit 1; }
 [ -f "$tasks" ] || { echo "FAIL: $track missing tasks.md"; exit 1; }
-grep -q "Files:" "$tasks" || { echo "FAIL: tasks without Files:"; exit 1; }
-grep -q "Validate:" "$tasks" || { echo "FAIL: tasks without Validate:"; exit 1; }
-require_approved "$spec" "spec.md"
-require_approved "$tasks" "tasks.md"
-require_closed_tasks "$tasks"
-echo "PASS: $track cycle intact"
+
+awk -v file="${spec#"$root"/}" '
+  function report(message) { print "FAIL: " file ": " message; failed=1 }
+  function finish_phase() {
+    if (!done_field) report(name " missing or empty Done:")
+    if (!files_field) report(name " missing or empty Files:")
+    if (!accept_field) report(name " missing or empty Accept:")
+  }
+  /^### Phase([[:space:]]|$)/ {
+    if (phase) finish_phase()
+    phase_count++
+    phase=1
+    name=$0
+    sub(/^### /, "", name)
+    done_field=files_field=accept_field=0
+    next
+  }
+  /^##/ {
+    if (phase) finish_phase()
+    phase=0
+    next
+  }
+  phase {
+    if ($0 ~ /^Done:[[:space:]]*[^[:space:]]/) done_field=1
+    if ($0 ~ /^Files:[[:space:]]*[^[:space:]]/) files_field=1
+    if ($0 ~ /^Accept:[[:space:]]*[^[:space:]]/) accept_field=1
+  }
+  END {
+    if (phase) finish_phase()
+    if (!phase_count) report("spec has no ### Phase section")
+    if (failed) exit 1
+  }
+' "$spec" || exit 1
+
+awk -v file="${tasks#"$root"/}" '
+  function report(message) { print "FAIL: " file ": " message; failed=1 }
+  function trim(value) { sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$/, "", value); return value }
+  function value_for(line, label, other, value, start, stop) {
+    start=index(line, label ":")
+    if (!start) return ""
+    value=substr(line, start+length(label)+1)
+    stop=index(value, other ":")
+    if (stop) value=substr(value, 1, stop-1)
+    return trim(value)
+  }
+  function visit(node,    dep, next_node, path, i) {
+    state[node]=1
+    stack[++depth]=node
+    for (dep in dependencies) {
+      split(dep, edge, SUBSEP)
+      if (edge[1] != node) continue
+      next_node=edge[2]
+      if (state[next_node] == 1) {
+        path=""
+        for (i=1; i<=depth; i++) {
+          if (stack[i] == next_node || path != "") path=path (path == "" ? "" : " -> ") stack[i]
+        }
+        report("dependency cycle involving " path " -> " next_node)
+      } else if (state[next_node] == 0) visit(next_node)
+    }
+    depth--
+    state[node]=2
+  }
+  /^## Group[[:space:]]+/ {
+    header_count++
+    current=$0
+    sub(/^## Group[[:space:]]+/, "", current)
+    if (match(current, /[[:space:]]+\(depends:[^)]*\)[[:space:]]*$/)) {
+      annotation=substr(current, RSTART, RLENGTH)
+      current=substr(current, 1, RSTART-1)
+      sub(/^[[:space:]]*\(depends:[[:space:]]*/, "", annotation)
+      sub(/\)[[:space:]]*$/, "", annotation)
+      count=split(annotation, deps, ",")
+      for (i=1; i<=count; i++) {
+        dep=trim(deps[i])
+        if (dep != "") pending[current]=pending[current] (pending[current] == "" ? "" : ",") dep
+      }
+    }
+    current=trim(current)
+    if (current == "") report("line " NR " has empty group name")
+    else if (seen[current]++) report("line " NR " duplicate group name " current)
+    groups[current]=1
+    next
+  }
+  /^- \[[ x]\] / {
+    task_count++
+    if (!header_count && !task_before_header) task_before_header=NR
+    files=value_for($0, "Files", "Validate")
+    validate=value_for($0, "Validate", "Files")
+    if (files == "") report("line " NR " task missing or empty Files:")
+    if (validate == "") report("line " NR " task missing or empty Validate:")
+  }
+  END {
+    if (!task_count) report("tasks file has no task lines")
+    if (header_count && task_before_header) report("line " task_before_header " task appears before first group header")
+    for (group in groups) {
+      count=split(pending[group], deps, ",")
+      for (i=1; i<=count && pending[group] != ""; i++) {
+        dep=deps[i]
+        if (!(dep in groups)) report("group " group " has unknown dependency " dep)
+        else if (dep == group) report("group " group " depends on itself")
+        else dependencies[group SUBSEP dep]=1
+      }
+    }
+    for (group in groups) if (!state[group]) visit(group)
+    if (failed) exit 1
+  }
+' "$tasks" || exit 1
+
+if [ "$mode" = "completion" ]; then
+  require_approved "$spec" "spec.md"
+  require_approved "$tasks" "tasks.md"
+  require_closed_tasks "$tasks"
+  echo "PASS: $track cycle intact"
+else
+  echo "PASS: $track structure valid"
+fi

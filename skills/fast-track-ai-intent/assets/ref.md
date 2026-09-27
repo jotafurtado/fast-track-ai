@@ -18,7 +18,7 @@ Canonical source locator. Do not copy protected content into this file.
 
 ## Contract
 
-- Maximum file size: 500 KB.
+- Maximum size of the entire ref file, including frontmatter, headings, and notes: 500 KB.
 - Required for both types: `type`, `captured`, `owner`, `sha256`, and `content_license`.
 - `content_license` is the source-content license, or `unknown` when no explicit license is available.
 - `inline`: omit `source`, `pin`, and `retrieved_at`. Store the exact redistributable source after `## Source content`. Normalize it to UTF-8 with LF line endings and exactly one terminal LF. `sha256` covers only those normalized source bytes, not frontmatter, headings, or capture notes.

@@ -1,5 +1,5 @@
 ---
-captured: YYYY-MM-DDTHH:MM:SSOFFSET
+captured: YYYY-MM-DDTHH:MM:SSZ
 owner: maintainer
 focus: one-line handoff focus
 ---
