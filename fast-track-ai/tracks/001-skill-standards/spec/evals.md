@@ -27,7 +27,7 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | `handoff` | Four mixed legacy/new-format handoffs are ordered by captured instant; the oldest is archived, the newest three remain active, and the archive is absent from INDEX | 0 | PASS |
 | `spec` | Structure checks require phases, non-empty phase fields, tasks, per-task fields, and valid unique acyclic groups; intent IDs must match track directories; ungrouped legacy tasks pass | 0 | PASS |
 | `contract` | Package contract records seven skills, owner paths, single template ownership, self-contained workflows, and deterministic artifact schemas | 0 | PASS |
-| `flow` | Intent, spec, and implement skills plus the tasks template contain continuous-flow next-step lines, the non-implementation exit, `## Group`, and `(depends:` | 0 | PASS |
+| `flow` | Intent, spec, and implement skills plus the tasks template contain continuous-flow next-step lines, `## Group`, and `(depends:`, and the intent skill does not contain the retired exit line | 0 | PASS |
 
 ## Behavioral Fixtures
 

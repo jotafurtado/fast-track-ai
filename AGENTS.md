@@ -16,7 +16,7 @@ Skills run against the target repo `fast-track-ai/` tree using scripts and templ
 ## Rules
 
 - Code in English: folders, files, functions, variables, frontmatter fields.
-- User-facing prose in English: commands, skills, error messages, except the continuous-flow next-step and non-implementation-exit lines (`. para continuar com a spec`, `. para implementar`, `. para ship (marca a track como concluida)`, `Track concluida. Nenhuma implementacao necessaria.`).
+- User-facing prose in English: commands, skills, error messages, except the continuous-flow next-step lines (`. para continuar com a spec`, `. para implementar`, `. para ship (marca a track como concluida)`).
 - Surgical changes: 1 behavior per change, validated in `/tmp` before commit.
 - No stubs: a published script must actually run in the test below.
 - A live target project is never edited from here. Method changes validate in `/tmp`.
@@ -40,11 +40,12 @@ Active memory lives in `fast-track-ai/`. Always read `fast-track-ai/INDEX.md` fi
 
 A change that will be implemented starts as `intent.md`. The `fast-track-ai-intent` skill drafts `intent.md` only. The `fast-track-ai-spec` skill drafts `spec.md` and `tasks.md`. Intent approval is not required before those files. No `spec.md` and `tasks.md` with `status: approved` means no implementation. Research, assess, and handoff may stop after their artifact and index regeneration without drafting an intent. Intents live in `fast-track-ai/tracks/NNN-slug/intent.md`.
 
-Continuous flow: each skill ends with a four-bullet summary plus a next-step line. `.` (or an affirmative synonym such as "sim", "pode continuar", "yes", "continue") means "understood, proceed" and chains the next skill for the same track without typing a command; any other input is a new instruction to the current skill. `.` never changes intent `status`; intent stays `draft` until the implement ship sets `shipped`.
+Continuous flow: intent, spec, and implement end with a four-bullet summary plus a next-step line. `.` (or an affirmative synonym such as "sim", "pode continuar", "yes", "continue") means "understood, proceed" and chains the next skill for the same track without typing a command; any other input is a new instruction to the current skill. `.` never changes intent `status`; intent stays `draft` until the implement ship sets `shipped`.
 
-Intent autonomy: the intent skill asks up to three focused interactive questions when the request is vague, and autonomously generates supporting artifacts when explicit triggers fire (research for unknown tech, ref for user-supplied URL, ADR for a qualifying answer, assessment for an evaluation request), informing in one sentence before each without asking permission. Purely investigative or evaluative requests exit cleanly with their artifact and no spec prompt.
+Intent autonomy: the intent skill asks up to three focused interactive questions when the request is vague, and autonomously generates supporting artifacts when explicit triggers fire (research for unknown tech, ref for user-supplied URL, ADR for a qualifying answer, assessment for an evaluation request), informing in one sentence before each without asking permission. Purely investigative or evaluative requests are routed to research or assess without creating a track.
 
 Tasks parallelism: `tasks.md` organizes tasks under `## Group <name>` headers with `(depends: <group>)` on dependent group headers. Tasks in one group run concurrently; groups run in dependency order. The implement skill resolves these annotations and requests an execution-class agent from the harness for task subagents.
+
 Supporting artifact contracts:
 
 - A ref preserves an immutable source input at `fast-track-ai/refs/<slug>.md`. It is `inline` or `pointer`, records content identity and license, and is cited on an intent in `refs:`. Changed source bytes require a new ref.

@@ -10,4 +10,5 @@ description: Produce an evidence-backed internal assessment of a project, featur
 5. Produce a defensible conclusion and concrete recommendations. Recommendations are inputs for later work, not implementation performed by this skill.
 6. Record the evaluator as the provider and model when known, or the available stable agent identity otherwise. If assessment is delegated, record the delegated evaluator rather than the coordinating agent.
 7. Write exactly one file to `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md` from `./assets/assessment.md`. Use the local calendar date, a descriptive kebab-case slug, and no lifecycle `status` field.
-8. Run `../fast-track-ai-init/scripts/fast-track-ai-index.sh <target>` using the owner copy and report any validation error. Stop after the assessment and regenerated index; do not create an intent unless separately requested.
+8. Run `../fast-track-ai-init/scripts/fast-track-ai-index.sh <target>` using the owner copy and report any validation error.
+9. When invoked by another skill as an auxiliary step, write the artifact, regenerate the index, return conclusion, limitations, and artifact path to the caller, and present nothing to the user. A direct call reports the result, path, and index outcome without a `.` line.

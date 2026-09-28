@@ -1040,7 +1040,7 @@ run_flow() {
   assert_contains "$intent_skill" ". para continuar com a spec"
   assert_contains "$spec_skill" ". para implementar"
   assert_contains "$implement_skill" ". para ship"
-  assert_contains "$intent_skill" "Track concluida. Nenhuma implementacao necessaria."
+  assert_not_contains "$intent_skill" "Track concluida. Nenhuma implementacao necessaria."
   assert_contains "$tasks_template" "## Group"
   assert_contains "$tasks_template" "(depends:"
   pass "flow"
