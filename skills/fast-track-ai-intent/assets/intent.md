@@ -25,7 +25,15 @@ Technical, security, brand, and deadline limits.
 What stays for another track, with number when it exists.
 
 ## Assumed state
-What the executor takes as truth without questioning.
+
+### Stated by the user
+Facts the user asserted. The executor takes these as given.
+
+### Unverified assumptions
+Premises the agent adopted without checking. The executor verifies each before a task depends on it.
+
+### Access limits
+Sources or systems the agent could not reach.
 
 ## Open questions
 Unanswered questions, with owner when one exists.

@@ -11,10 +11,12 @@ What is true when the track closes.
 
 ## Phases
 
+Each phase separates the delivered state from its check. `Done:` names the delivered, observable state an observer can see when the phase closes. `Accept:` names the check that proves that state: a command with its expected result, or an observable procedure with its expected observation.
+
 ### Phase 1: name
-Done: what is ready and how to observe it.
+Done: the delivered, observable state when this phase closes.
 Files: explicit list of touched files.
-Accept: one acceptance line for the phase.
+Accept: the command with its expected result, or the observable procedure with its expected observation.
 
 ### Phase 2: name
 Done:

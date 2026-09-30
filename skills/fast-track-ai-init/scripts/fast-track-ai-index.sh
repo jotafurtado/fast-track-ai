@@ -338,13 +338,17 @@ if [ -d "$ai/handoffs" ]; then
     require_heading "$handoff" "## Active user instructions, verbatim"
     require_heading "$handoff" "## Current state"
     require_heading "$handoff" "## Completed"
-    require_heading "$handoff" "## P0 next actions"
-    require_heading "$handoff" "## P1 next actions"
     require_heading "$handoff" "## Unresolved decisions"
     require_heading "$handoff" "## Relevant paths and durable artifacts"
     require_heading "$handoff" "## Observed command results"
     require_heading "$handoff" "## Blockers and risks"
-    require_heading "$handoff" "## First next action"
+    if grep -Fqx "## Next actions" "$handoff"; then
+      :
+    elif grep -Fqx "## P0 next actions" "$handoff" && grep -Fqx "## P1 next actions" "$handoff" && grep -Fqx "## First next action" "$handoff"; then
+      :
+    else
+      fail "$name missing heading ## Next actions"
+    fi
     handoff_sort_rows+=("$epoch"$'\t'"$name"$'\t'"$captured")
   done
 fi

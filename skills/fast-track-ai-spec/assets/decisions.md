@@ -3,7 +3,6 @@ id: NNN-slug
 status: accepted
 date: YYYY-MM-DD
 owner: maintainer
-evidence: []
 ---
 
 # ADR: NNN-slug

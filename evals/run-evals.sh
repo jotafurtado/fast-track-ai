@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "$0")/../../../../.." && pwd)"
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 mode="${1:-all}"
 work="$(mktemp -d "${TMPDIR:-/tmp}/fast-track-ai-skill-standards.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
@@ -166,6 +166,90 @@ Run the next fixture.
 EOF
 }
 
+write_handoff_new() {
+  file="$1"
+  captured="$2"
+  focus="$3"
+  mkdir -p "$(dirname "$file")"
+  cat >"$file" <<EOF
+---
+captured: $captured
+owner: maintainer
+focus: $focus
+---
+
+# Handoff: $focus
+
+## Objective
+Fixture objective.
+
+## Active user instructions, verbatim
+> Preserve this exact instruction.
+
+## Current state
+Verified fixture state.
+
+## Completed
+- Fixture completed.
+
+## Next actions
+1. Run the next fixture.
+2. Then the following step.
+
+## Unresolved decisions
+- None.
+
+## Relevant paths and durable artifacts
+- fast-track-ai/INDEX.md
+
+## Observed command results
+- Fixture command passed.
+
+## Blockers and risks
+- None known.
+EOF
+}
+
+write_handoff_no_actions() {
+  file="$1"
+  captured="$2"
+  focus="$3"
+  mkdir -p "$(dirname "$file")"
+  cat >"$file" <<EOF
+---
+captured: $captured
+owner: maintainer
+focus: $focus
+---
+
+# Handoff: $focus
+
+## Objective
+Fixture objective.
+
+## Active user instructions, verbatim
+> Preserve this exact instruction.
+
+## Current state
+Verified fixture state.
+
+## Completed
+- Fixture completed.
+
+## Unresolved decisions
+- None.
+
+## Relevant paths and durable artifacts
+- fast-track-ai/INDEX.md
+
+## Observed command results
+- Fixture command passed.
+
+## Blockers and risks
+- None known.
+EOF
+}
+
 init_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-init.sh"
 index_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-index.sh"
 gate="$repo_root/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
@@ -235,6 +319,19 @@ run_init() {
   "$init_script" "$symlinked" >/dev/null
   [ -L "$symlinked/AGENTS.md" ] || fail "init replaced symlinked AGENTS.md"
   cmp "$work/init-expected.md" "$symlinked/AGENTS.md" || fail "init did not update symlink target"
+
+  init_skill="$repo_root/skills/fast-track-ai-init/SKILL.md"
+  assert_contains "$init_skill" '../fast-track-ai-spec/scripts/fast-track-ai-gate.sh'
+  assert_contains "$init_skill" 'yes-or-no question'
+  assert_contains "$init_skill" 'assets/legacy/'
+  assert_contains "$init_skill" 'Do not invent a Done, Files, Accept, Validate, or approval value'
+
+  snippet="$repo_root/skills/fast-track-ai-init/assets/AGENTS-snippet.md"
+  assert_not_contains "$snippet" 'Intent autonomy'
+  assert_not_contains "$snippet" 'Tasks parallelism'
+  assert_not_contains "$snippet" 'Each script and template has one owner skill'
+  assert_contains "$snippet" 'status: approved'
+  assert_contains "$snippet" 'intent, spec, and implement end with a four-bullet summary'
 
   pass "init"
 }
@@ -514,6 +611,20 @@ superseded_by: 001-example-decision/' "$target/fast-track-ai/decisions/001-examp
   assert_contains "$work/failure.err" "more than three handoffs are active"
   rm "$target/fast-track-ai/handoffs/2026-09-22-100000Z-fourth.md"
 
+  # A new-format (## Next actions) handoff is accepted alongside the legacy-heading fixtures.
+  rm "$target/fast-track-ai/handoffs/2026-09-21-100000Z-valid.md"
+  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+  "$index_script" "$target" >/dev/null
+  assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-21-100000Z-nextactions | 2026-09-21T10:00:00Z |"
+
+  # A handoff with neither heading set is rejected and leaves INDEX.md unchanged.
+  cp "$target/fast-track-ai/INDEX.md" "$work/index-before-noactions.md"
+  write_handoff_no_actions "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+  expect_failure "index with handoff missing next actions" "$index_script" "$target"
+  assert_contains "$work/failure.err" "missing heading ## Next actions"
+  cmp "$work/index-before-noactions.md" "$target/fast-track-ai/INDEX.md" || fail "rejected handoff changed INDEX.md"
+  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+
   "$index_script" "$target" >/dev/null
   cp "$target/fast-track-ai/INDEX.md" "$work/index-before-invalid.md"
   cat >"$target/fast-track-ai/research/invalid-research.md" <<'EOF'
@@ -563,10 +674,6 @@ run_approval() {
   write_spec "$short/fast-track-ai/tracks/001-example/spec.md" "approved"
   write_tasks "$short/fast-track-ai/tracks/001-example/tasks.md" "approved" "x"
   "$gate" --track 001-example --root "$short" >/dev/null
-  for track in 008-unified-spec 009-track-terminal-states 010-approval-ask-not-gate-fail; do
-    gate_output="$("$gate" --track "$track" --root "$repo_root")"
-    [ "$gate_output" = "PASS: $track cycle intact" ] || fail "$track completion gate output was unexpected"
-  done
 
   write_plan "$short/fast-track-ai/tracks/001-example/plan.md" "approved"
   expect_failure "gate with leftover plan.md" "$gate" --track 001-example --root "$short"
@@ -609,20 +716,6 @@ run_install() {
   pass "install"
 }
 
-run_audit() {
-  audit="$repo_root/fast-track-ai/tracks/001-skill-standards/spec/audit.md"
-  for skill in dot-ai-init dot-ai-intent dot-ai-plan dot-ai-implement dot-ai-research dot-ai-handoff; do
-    for rule in 1 2 3 4 5 6; do
-      [ "$(grep -Fc "| $skill | $rule | PASS |" "$audit")" -eq 1 ] || fail "audit lacks one PASS row for $skill rule $rule"
-    done
-  done
-  rows="$(grep -Ec '^\| dot-ai-(init|intent|plan|implement|research|handoff) \| [1-6] \| PASS \| `.+` \|$' "$audit" || true)"
-  [ "$rows" -eq 36 ] || fail "audit has $rows evidence-backed PASS rows; expected 36"
-  assert_not_contains "$audit" "| FAIL |"
-  assert_not_contains "$audit" "| PARTIAL |"
-  pass "audit"
-}
-
 run_resources() {
   init_skill="$repo_root/skills/fast-track-ai-init/SKILL.md"
   intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
@@ -655,6 +748,9 @@ run_resources() {
     assert_not_contains "$skill_file" 'fast-track-ai-init/assets/assessment.md'
     assert_not_contains "$skill_file" 'fast-track-ai-init/assets/refs.md'
   done
+  for skill_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md; do
+    assert_contains "$skill_file" "resolve from this skill's installed directory, and \`fast-track-ai/\` paths resolve from the target repository root"
+  done
   pass "resource guidance"
 }
 
@@ -665,7 +761,6 @@ run_workflows() {
   assess_template="$repo_root/skills/fast-track-ai-assess/assets/assessment.md"
   research_template="$repo_root/skills/fast-track-ai-research/assets/research.md"
   handoff_template="$repo_root/skills/fast-track-ai-handoff/assets/handoff.md"
-  research_artifact="$repo_root/fast-track-ai/research/artifact-standards.md"
 
   for workflow in assess research handoff; do
     assert_file "$repo_root/commands/fast-track-ai-$workflow.md"
@@ -697,33 +792,43 @@ run_workflows() {
   for field_name in captured owner focus; do
     assert_contains "$handoff_template" "$field_name:"
   done
-  for heading in '## Objective' '## Active user instructions, verbatim' '## Current state' '## Completed' '## P0 next actions' '## P1 next actions' '## Unresolved decisions' '## Relevant paths and durable artifacts' '## Observed command results' '## Blockers and risks' '## First next action'; do
+  for heading in '## Objective' '## Active user instructions, verbatim' '## Current state' '## Completed' '## Next actions' '## Unresolved decisions' '## Relevant paths and durable artifacts' '## Observed command results' '## Blockers and risks'; do
     assert_contains "$handoff_template" "$heading"
   done
   assert_not_matches "$handoff_template" '^status:'
+  assert_not_contains "$handoff_template" '## P0 next actions'
+  assert_not_contains "$handoff_template" '## First next action'
 
-  compatible_count="$(grep -Ec '\| 2026-09-20 \| (MIT-compatible|Apache-2\.0-compatible)' "$research_artifact")"
-  [ "$compatible_count" -eq 10 ] || fail "research has $compatible_count compatible source rows; expected 10"
-  citation_only_count="$(grep -c '| Citation-only |' "$research_artifact")"
-  [ "$citation_only_count" -eq 2 ] || fail "research has $citation_only_count citation-only rows; expected 2"
-  assert_contains "$research_artifact" '| Firecrawl deep-research | ISC | Excluded |'
   for package_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md "$repo_root"/commands/fast-track-ai-*.md; do
     assert_not_matches "$package_file" 'Jhony Walker|jhonywalkeer|Guia Completo sobre Architecture'
   done
+
+  assert_contains "$research_skill" 'the result is inconclusive'
+  assert_contains "$research_skill" 'Never overwrite an existing research file silently.'
+  assert_contains "$assess_skill" 'the problem, its evidence, its consequence, and the recommendation'
+  assert_contains "$assess_skill" 'any priority follows from the stated consequence'
+  assert_contains "$assess_skill" 'Set `tracks` to the IDs of the tracks the assessment evaluates, or `[]`'
+  assert_contains "$assess_skill" 'Never overwrite an existing assessment file silently.'
+  assert_contains "$assess_template" 'the problem, its evidence citation, its consequence, and the recommendation'
   pass "self-contained artifact workflows"
 }
 
 run_refs() {
   template="$repo_root/skills/fast-track-ai-intent/assets/ref.md"
   intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
+  intent_template="$repo_root/skills/fast-track-ai-intent/assets/intent.md"
   assert_file "$template"
-  for contract_text in 'content_license' 'Normalize it to UTF-8' 'observed at capture time' 'never the URL' 'Use `pin` when' 'retrieved_at' 'compare the candidate content hash' 'create no ref and no synthetic hash'; do
-    assert_contains "$template" "$contract_text"
+  for contract_text in 'content_license' 'Normalize it to UTF-8' 'observed at capture time' 'never the URL' 'Use `pin` when' 'retrieved_at'; do
+    assert_contains "$intent_skill" "$contract_text"
   done
+  assert_not_contains "$template" '## Contract'
   assert_contains "$intent_skill" 'compare the hash with existing refs'
   assert_contains "$intent_skill" 'create no ref or synthetic hash'
   assert_contains "$intent_skill" 'Open questions'
   assert_contains "$intent_skill" 'Assumed state'
+  for provenance_list in '### Stated by the user' '### Unverified assumptions' '### Access limits'; do
+    assert_contains "$intent_template" "$provenance_list"
+  done
 
 
   unavailable="$work/unavailable-ref"
@@ -771,7 +876,6 @@ run_decisions() {
   spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
   implement_skill="$repo_root/skills/fast-track-ai-implement/SKILL.md"
   template="$repo_root/skills/fast-track-ai-spec/assets/decisions.md"
-  decision="$repo_root/fast-track-ai/decisions/007-dedicated-assessment-skill.md"
 
   assert_contains "$intent_skill" 'durable, costly to reverse, surprising without context, or resolves a meaningful trade-off'
   assert_contains "$intent_skill" 'Do not create an ADR for a local, easily reversible, or obvious implementation choice.'
@@ -779,13 +883,10 @@ run_decisions() {
   assert_contains "$implement_skill" 'materially changes approved `spec.md` or `tasks.md`'
   assert_contains "$implement_skill" 'renewed explicit approval'
   assert_contains "$implement_skill" 'If it does not materially change approved scope or design, record it and continue.'
-  assert_contains "$template" 'evidence: []'
+  assert_not_matches "$template" '^evidence:'
   assert_contains "$template" '## Evidence'
-  for heading in '## Context' '## Decision' '## Rationale' '## Alternatives considered' '## Consequences' '## Evidence'; do
-    assert_contains "$decision" "$heading"
-  done
-  assert_contains "$decision" 'fast-track-ai/tracks/002-assessment-standard/intent.md'
-  assert_not_contains "$decision" 'superseded_by:'
+  assert_contains "$spec_skill" 'the ADR frontmatter has no `evidence` field'
+  assert_contains "$spec_skill" 'set the original'"'"'s `status: superseded` and add `superseded_by: <replacement-id>`'
   replacement="$work/replacement-target"
   "$init_script" "$replacement" >/dev/null
   write_intent "$replacement" "001-replacement-fixture" "draft"
@@ -903,6 +1004,17 @@ run_handoff() {
   third_row="$(grep -nF '| 2026-09-20-100000Z-third |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   fourth_row="$(grep -nF '| 2026-09-20-110000Z-fourth |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   [ "$second_row" -lt "$third_row" ] && [ "$third_row" -lt "$fourth_row" ] || fail "handoffs are not ordered by captured instant"
+
+  # A new-format handoff is accepted, and one with neither heading set is rejected without changing INDEX.
+  rm "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md"
+  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md" "2026-09-20T10:00:00Z" "third-new"
+  "$index_script" "$target" >/dev/null
+  assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-20-100000Z-third | 2026-09-20T10:00:00Z |"
+  cp "$target/fast-track-ai/INDEX.md" "$work/handoff-index-before.md"
+  write_handoff_no_actions "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md" "2026-09-20T10:00:00Z" "third-new"
+  expect_failure "handoff missing next actions" "$index_script" "$target"
+  assert_contains "$work/failure.err" "missing heading ## Next actions"
+  cmp "$work/handoff-index-before.md" "$target/fast-track-ai/INDEX.md" || fail "rejected handoff changed INDEX.md"
   pass "handoff active window"
 }
 
@@ -1029,6 +1141,27 @@ EOF
 
   write_plan "$ok/fast-track-ai/tracks/003-example/plan.md" "approved"
   expect_failure "gate with leftover plan.md" "$gate" --track 003-example --root "$ok"
+
+  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
+  spec_template="$repo_root/skills/fast-track-ai-spec/assets/spec.md"
+  tasks_template="$repo_root/skills/fast-track-ai-spec/assets/tasks.md"
+  assert_contains "$spec_skill" 'Done:'
+  assert_contains "$spec_skill" 'Accept:'
+  assert_contains "$spec_skill" '(Phase N)'
+  assert_contains "$spec_skill" 'observable procedure with its expected observation'
+  assert_contains "$spec_template" 'Done: the delivered, observable state when this phase closes.'
+  assert_contains "$spec_template" 'Accept: the command with its expected result, or the observable procedure with its expected observation.'
+  assert_contains "$tasks_template" '(Phase 1):'
+  assert_contains "$tasks_template" 'Validate: command or procedure with its expected result.'
+
+  from_template="$work/spec-from-template"
+  write_intent "$from_template" "005-template" "draft"
+  base_dir="$from_template/fast-track-ai/tracks/005-template"
+  sed 's/NNN-slug/005-template/g' "$spec_template" >"$base_dir/spec.md"
+  sed -i.bak $'s/^Done:$/Done: phase two delivered state/; s/^Files:$/Files: fixture/; s/^Accept:$/Accept: run true, expect exit 0/' "$base_dir/spec.md"
+  rm -f "$base_dir/spec.md.bak"
+  sed 's/NNN-slug/005-template/g' "$tasks_template" >"$base_dir/tasks.md"
+  "$gate" --mode structure --track 005-template --root "$from_template" >/dev/null
   pass "spec cycle"
 }
 
@@ -1040,22 +1173,26 @@ run_flow() {
   assert_contains "$intent_skill" ". para continuar com a spec"
   assert_contains "$spec_skill" ". para implementar"
   assert_contains "$implement_skill" ". para ship"
+  assert_contains "$implement_skill" "Delegate proportionally"
+  assert_contains "$implement_skill" "each delegated task gets its own subagent"
+  assert_not_contains "$implement_skill" "one task per agent"
+  assert_contains "$implement_skill" "continue from the first open task"
+  assert_contains "$implement_skill" "record the divergence in the track's"
   assert_not_contains "$intent_skill" "Track concluida. Nenhuma implementacao necessaria."
   assert_contains "$tasks_template" "## Group"
   assert_contains "$tasks_template" "(depends:"
   pass "flow"
 }
 
-run_contract() {
-  contract="$repo_root/fast-track-ai/tracks/001-skill-standards/spec/contracts/skill-package.md"
-  assert_contains "$contract" "Sibling owner paths"
-  assert_contains "$contract" "../fast-track-ai-init/scripts/fast-track-ai-index.sh"
-  assert_contains "$contract" "skills/fast-track-ai-*"
-  assert_contains "$contract" "seven package skills"
-  assert_contains "$contract" "Self-contained workflows"
-  assert_contains "$contract" "Template ownership"
-  assert_not_contains "$contract" "is forbidden; the owner copy path"
-  pass "package contract"
+run_isolation() {
+  iso="$work/isolation"
+  mkdir -p "$iso"
+  for item in skills commands install.sh AGENTS.md evals; do
+    cp -R "$repo_root/$item" "$iso/$item"
+  done
+  [ ! -e "$iso/fast-track-ai" ] || fail "isolation copy unexpectedly contains fast-track-ai/"
+  FAST_TRACK_AI_ISOLATION_GUARD=1 bash "$iso/evals/run-evals.sh" all >/dev/null
+  pass "isolation"
 }
 
 run_case() {
@@ -1065,21 +1202,23 @@ run_case() {
     index) run_index ;;
     approval) run_approval ;;
     install) run_install ;;
-    audit) run_audit ;;
     resources) run_resources ;;
     workflows) run_workflows ;;
     refs) run_refs ;;
     decisions) run_decisions ;;
     handoff) run_handoff ;;
     spec) run_spec ;;
-    contract) run_contract ;;
     flow) run_flow ;;
+    isolation) run_isolation ;;
     *) fail "unknown eval: $1" ;;
   esac
 }
 
 if [ "$mode" = "all" ]; then
-  for eval_name in self init index approval install audit resources workflows refs decisions handoff spec contract flow; do
+  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow isolation; do
+    if [ "$eval_name" = "isolation" ] && [ "${FAST_TRACK_AI_ISOLATION_GUARD:-}" = "1" ]; then
+      continue
+    fi
     run_case "$eval_name"
   done
   pass "all evals"

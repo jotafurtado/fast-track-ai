@@ -18,11 +18,9 @@ Verified state at capture time. Distinguish observation from inference.
 ## Completed
 - Verified completed work with relevant paths.
 
-## P0 next actions
-- Work required before any lower-priority action.
-
-## P1 next actions
-- Important follow-up after P0 work.
+## Next actions
+1. The first concrete action the receiving agent should perform.
+2. The next action after it, in order.
 
 ## Unresolved decisions
 - Decision still requiring user or maintainer input.
@@ -35,6 +33,3 @@ Verified state at capture time. Distinguish observation from inference.
 
 ## Blockers and risks
 - Blocker, risk, or `None known`.
-
-## First next action
-One concrete action the receiving agent should perform first.

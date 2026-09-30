@@ -30,6 +30,8 @@ Diga ao agente: `setup fast-track-ai`, `install fast-track-ai` ou `init the meth
 
 O script `skills/fast-track-ai-init/scripts/fast-track-ai-init.sh` cria a árvore e o bloco gerenciado em `AGENTS.md`. Em seguida `fast-track-ai-index.sh` gera `fast-track-ai/INDEX.md`.
 
+Se o repositório alvo já tem tracks, o init checa cada uma com o gate e lista as que não conformam. Ele faz uma pergunta de sim ou não antes de normalizar qualquer track e não muda nada até você responder.
+
 Leia o `INDEX.md` antes de procurar track, ref, research, assessment, decision ou handoff. Ele é gerado. Edição manual se perde na próxima geração.
 
 ## Ciclo de uma mudança
@@ -78,7 +80,6 @@ Frases literais do protocolo:
 - `. para continuar com a spec`
 - `. para implementar`
 - `. para ship (marca a track como concluida)`
-- `Track concluida. Nenhuma implementacao necessaria.`
 
 Sinônimos do ponto: `sim`, `pode continuar`, `yes`, `continue`.
 
@@ -98,7 +99,7 @@ flowchart TD
 
 Comando explícito de research, assess ou handoff para no artefato e no index. Não cria track.
 
-Se o pedido entrar pela skill de intent e for só investigação ou avaliação, o intent fica `draft` e a última linha é `Track concluida. Nenhuma implementacao necessaria.`
+Se o pedido entrar pela skill de intent e for só investigação ou avaliação, ele é roteado para research ou assess sem criar track.
 
 ## Artefatos que entram sozinhos
 
@@ -122,7 +123,7 @@ flowchart LR
 | Research | `fast-track-ai/research/<slug>.md` | Fato externo, com fontes, conflitos e limites. Sem `status`. |
 | Assessment | `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md` | Avaliação para dentro do projeto, com evidência e contraevidência. Sem `status`. |
 | Decision | `fast-track-ai/decisions/<NNN-slug>.md` | Escolha aceita. Só `accepted` ou `superseded`. |
-| Handoff | `fast-track-ai/handoffs/<YYYY-MM-DD-HHmm-OFFSET>-<slug>.md` | Contexto para outra sessão. Os 3 mais novos ficam ativos. O resto vai para `handoffs/archive/`. |
+| Handoff | `fast-track-ai/handoffs/<YYYY-MM-DD-HHmmssZ>-<slug>.md` | Contexto para outra sessão. Os 3 mais novos ficam ativos. O resto vai para `handoffs/archive/`. |
 
 No intent, cite o slug em `research:`, `refs:`, `assessments:` ou `decisions:`. Assessment não entra em `research:`.
 
@@ -146,7 +147,7 @@ Tasks do mesmo `## Group` rodam juntas. Cada uma tem `Files` e `Validate`. Arqui
 
 Grupo seguinte declara `(depends: Nome)` no título e espera o anterior. Na dúvida, o agente separa em grupos sequenciais. O mesmo arquivo não é editado em paralelo.
 
-A implementação toca só os arquivos listados na spec e na task. Item em `Out of scope` fica de fora. `Assumed state` é verdade para o executor. Se faltar arquivo na lista, o agente para e pergunta.
+A implementação toca só os arquivos listados na spec e na task. Item em `Out of scope` fica de fora. O `Assumed state` do intent separa três listas: `Stated by the user` são fatos que você afirmou e o executor toma como dados; `Unverified assumptions` são premissas que o agente adotou sem checar e que ele verifica antes de uma task depender delas; `Access limits` são fontes que o agente não alcançou. Se faltar arquivo na lista, o agente para e pergunta.
 
 ## Status
 
@@ -186,17 +187,8 @@ A review olha o diff contra a spec. Severidade: `[blocking]` corrige antes de se
 commands/                 wrappers dos 7 comandos
 skills/fast-track-ai-*/   skill, template e script de cada comando
 install.sh                links no harness
-fast-track-ai/            memoria deste proprio repo
-openspec/specs/           contrato do metodo
+evals/                    suite de evals do mantenedor
 ```
-
-`fast-track-ai/` aqui dentro é o histórico do método aplicado a si mesmo. Num repo alvo, a mesma pasta começa vazia, só com o index.
-
-As specs em `openspec/specs/` governam o pacote. Não são um passo do seu ciclo de feature.
-
-- `continuous-flow`: ponto, resumo de 4 bullets, perguntas, artefatos automáticos, saída sem código.
-- `method-artifacts`: ref, research, assessment, decision, handoff, index.
-- `package-surface`: texto publicado, comandos instalados, status do intent.
 
 Cada script e cada template tem uma skill dona. Outra skill aponta para a cópia da dona. Não existe pasta `shared`.
 
