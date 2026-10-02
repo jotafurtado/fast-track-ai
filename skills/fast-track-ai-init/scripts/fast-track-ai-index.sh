@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # fast-track-ai-index.sh generates fast-track-ai/INDEX.md from frontmatter and validates.
 # Usage: fast-track-ai-index.sh [repo-root]. Fails with an objective message on invalid input.
+# Frontmatter uses a canonical subset, not general YAML: line 1 is exactly `---`, the next line
+# that is exactly `---` closes the block, each non-blank line between them is one `key: value`
+# field (key matches [a-z][a-z0-9_]*, value may be empty, a flow list [a, b] is one value), and
+# no key appears twice. Fields are read only from the block that opens on line 1.
 set -euo pipefail
 
 export LC_ALL=C
@@ -18,7 +22,30 @@ handoff_rows=""
 fail() { echo "ERROR: $1" >&2; errors=$((errors + 1)); }
 
 field() {
-  awk -v key="$2" '/^---$/{c++; next} c==1 && index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
+  awk -v key="$2" 'NR == 1 { if ($0 != "---") exit; next } $0 == "---" { exit } index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
+}
+
+frontmatter_violation() {
+  awk '
+    NR == 1 { if ($0 != "---") exit; open=1; next }
+    $0 == "---" { closed=1; exit }
+    $0 ~ /^[[:space:]]*$/ { next }
+    $0 !~ /^[a-z][a-z0-9_]*:([[:space:]].*)?$/ { print "frontmatter line " NR " is not a key: value field"; bad=1; exit }
+    {
+      key=$0
+      sub(/:.*/, "", key)
+      if (seen[key]++) { print "duplicate frontmatter field " key; bad=1; exit }
+    }
+    END { if (open && !closed && !bad) print "frontmatter not closed" }
+  ' "$1"
+}
+
+frontmatter_ok() {
+  local violation
+  violation="$(frontmatter_violation "$1")"
+  [ -z "$violation" ] && return 0
+  fail "$2 $violation"
+  return 1
 }
 
 validate_flow_list() {
@@ -117,12 +144,14 @@ done
 for intent in "$ai"/tracks/*/intent.md; do
   [ -f "$intent" ] || continue
   track="$(basename "$(dirname "$intent")")"
+  frontmatter_ok "$intent" "$track/intent.md" || continue
   id="$(field "$intent" id || true)"
   status="$(field "$intent" status || true)"
   [[ "$track" =~ ^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail "$track invalid track directory name"
   [ -n "$id" ] || { fail "$track missing id field"; continue; }
   [ -n "$status" ] || { fail "$track missing status field"; continue; }
   [ "$id" = "$track" ] || fail "$track id mismatch: $id"
+  # active is accepted only as a legacy value from earlier package versions; no live skill writes it.
   case "$status" in draft|active|shipped|dropped|superseded) ;; *) fail "$track invalid status: $status";; esac
   for category in refs research assessments decisions; do
     validate_flow_list "$intent" "$category" "$category" "$(field "$intent" "$category" || true)"
@@ -136,6 +165,7 @@ if [ -d "$ai/refs" ]; then
     [ -f "$ref" ] || continue
     name="$(basename "$ref")"
     stem="${name%.md}"
+    frontmatter_ok "$ref" "$name" || continue
     size="$(wc -c < "$ref" | tr -d ' ')"
     ref_type="$(field "$ref" type || true)"
     captured="$(field "$ref" captured || true)"
@@ -197,6 +227,7 @@ if [ -d "$ai/research" ]; then
     [ -f "$research" ] || continue
     name="$(basename "$research")"
     stem="${name%.md}"
+    frontmatter_ok "$research" "$name" || continue
     captured="$(field "$research" captured || true)"
     owner="$(field "$research" owner || true)"
     status="$(field "$research" status || true)"
@@ -221,6 +252,7 @@ if [ -d "$ai/assessments" ]; then
     [ -f "$assessment" ] || continue
     name="$(basename "$assessment")"
     stem="${name%.md}"
+    frontmatter_ok "$assessment" "$name" || continue
     captured="$(field "$assessment" captured || true)"
     owner="$(field "$assessment" owner || true)"
     scope="$(field "$assessment" scope || true)"
@@ -253,6 +285,7 @@ if [ -d "$ai/decisions" ]; then
     [ -f "$decision" ] || continue
     name="$(basename "$decision")"
     stem="${name%.md}"
+    frontmatter_ok "$decision" "$name" || continue
     id="$(field "$decision" id || true)"
     status="$(field "$decision" status || true)"
     date="$(field "$decision" date || true)"
@@ -311,6 +344,7 @@ if [ -d "$ai/handoffs" ]; then
     active_handoffs=$((active_handoffs + 1))
     name="$(basename "$handoff")"
     stem="${name%.md}"
+    frontmatter_ok "$handoff" "$name" || continue
     captured="$(field "$handoff" captured || true)"
     owner="$(field "$handoff" owner || true)"
     focus="$(field "$handoff" focus || true)"

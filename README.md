@@ -177,7 +177,7 @@ Depois da implementação, `PASS` exige:
 4. Nenhuma task `- [ ]`.
 5. Sem `plan.md`. Sem arquivo solto na raiz da track.
 
-Raiz da track: `intent.md`, `spec.md`, `tasks.md`, `decisions.md` e `assets/`. Saída auxiliar vai em `assets/`. Pasta `spec/` antiga não escolhe o ciclo.
+Raiz da track: `intent.md`, `spec.md`, `tasks.md` e `assets/`. Saída auxiliar vai em `assets/`. Pasta `spec/` antiga não escolhe o ciclo.
 
 A review olha o diff contra a spec. Severidade: `[blocking]` corrige antes de seguir, `[important]` deve corrigir, `[nit]` é opcional, `[suggestion]` é alternativa.
 

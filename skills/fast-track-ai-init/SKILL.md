@@ -11,10 +11,11 @@ description: Installs the fast-track-ai tree into a target repo, idempotently. U
    - `structure` when the track root holds `spec.md` or `tasks.md` and the intent is not `shipped`, `dropped`, or `superseded`.
    - No check for a `dropped` or `superseded` track, or for a track that holds only `intent.md`.
 
-   Collect every track whose gate fails. When none fail, report that the tracks conform and ask nothing. When any fail, list each failing track with its first gate message, then ask the user one yes-or-no question: whether to normalize the listed tracks. Change no track before the answer.
+   Collect every track whose gate fails. Independently of the gate, also collect every track whose root holds `decisions.md`, with the reason `legacy root decisions.md`, including `dropped` and `superseded` tracks and tracks the gate does not check. When none are collected, report that the tracks conform and ask nothing. When any are collected, list each such track with its first gate message or the legacy reason, then ask the user one yes-or-no question: whether to normalize the listed tracks. Change no track before the answer.
 
    On yes, normalize each listed track to the current contract:
-   - Move each root entry the gate rejects into the track's `assets/legacy/<name>`, and stop with a reported collision if the destination already exists.
+   - Move each root entry the gate rejects, including hidden entries such as `.DS_Store`, into the track's `assets/legacy/<name>`, and stop with a reported collision if the destination already exists. When the rejected entry is a regular file named `assets`, stop for that track and report it instead of moving anything, because the file occupies the directory that would receive it.
+   - Move a root `decisions.md` to `assets/legacy/decisions.md` without changing its content, with the same collision stop.
    - Rewrite `spec.md` and `tasks.md` in the current template shape from `../fast-track-ai-spec/assets/spec.md` and `../fast-track-ai-spec/assets/tasks.md`, using only content already present in the track. Keep the existing `status`.
    - Do not invent a Done, Files, Accept, Validate, or approval value. When a value or an approval cannot be derived from existing content, ask for it or leave that track failing and report it. On a status mismatch, such as a shipped intent with a draft spec, ask before approving.
    - Rerun the gate and report the result per track.

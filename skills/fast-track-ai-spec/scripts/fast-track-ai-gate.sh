@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # fast-track-ai-gate.sh validates track structure and, in completion mode, approval and task closure.
 # Usage: fast-track-ai-gate.sh --track NNN-slug [--root DIR] [--mode structure|completion]
+# Frontmatter of intent.md, spec.md, and tasks.md uses a canonical subset, not general YAML:
+# line 1 is exactly `---`, the next line that is exactly `---` closes the block, each non-blank
+# line between them is one `key: value` field (key matches [a-z][a-z0-9_]*, value may be empty,
+# a flow list [a, b] is one value), and no key appears twice. Fields are read only from that block.
 set -euo pipefail
 
 track=""
@@ -21,7 +25,28 @@ case "$mode" in
 esac
 
 frontmatter_field() {
-  awk -v key="$2" '/^---$/{section++; next} section==1 && index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
+  awk -v key="$2" 'NR == 1 { if ($0 != "---") exit; next } $0 == "---" { exit } index($0, key ":") == 1 {sub(/^[^:]+:[[:space:]]*/, ""); print; exit}' "$1"
+}
+
+frontmatter_violation() {
+  awk '
+    NR == 1 { if ($0 != "---") exit; open=1; next }
+    $0 == "---" { closed=1; exit }
+    $0 ~ /^[[:space:]]*$/ { next }
+    $0 !~ /^[a-z][a-z0-9_]*:([[:space:]].*)?$/ { print "frontmatter line " NR " is not a key: value field"; bad=1; exit }
+    {
+      key=$0
+      sub(/:.*/, "", key)
+      if (seen[key]++) { print "duplicate frontmatter field " key; bad=1; exit }
+    }
+    END { if (open && !closed && !bad) print "frontmatter not closed" }
+  ' "$1"
+}
+
+require_frontmatter() {
+  local violation
+  violation="$(frontmatter_violation "$1")"
+  [ -z "$violation" ] || { echo "FAIL: ${1#"$root"/} $violation"; exit 1; }
 }
 
 require_approved() {
@@ -42,7 +67,9 @@ require_closed_tasks() {
 
 base="$root/fast-track-ai/tracks/$track"
 intent="$base/intent.md"
-[ -f "$intent" ] || { echo "FAIL: $track missing intent.md"; exit 1; }
+[ -e "$intent" ] || { echo "FAIL: $track missing intent.md"; exit 1; }
+[ -f "$intent" ] || { echo "FAIL: $track intent.md must be a file"; exit 1; }
+require_frontmatter "$intent"
 id="$(frontmatter_field "$intent" id)"
 [ -n "$id" ] || { echo "FAIL: intent without id"; exit 1; }
 [ "$id" = "$track" ] || { echo "FAIL: intent id mismatch: $id (expected $track)"; exit 1; }
@@ -51,6 +78,14 @@ if [ -e "$base/plan.md" ]; then
   echo "FAIL: $track has plan.md; live tracks must not keep plan.md"
   exit 1
 fi
+
+hidden=0
+for entry in "$base"/.[!.]* "$base"/..?*; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  echo "FAIL: $track hidden root entry: $(basename "$entry")"
+  hidden=1
+done
+[ "$hidden" = "0" ] || exit 1
 
 allowed="intent.md spec.md tasks.md decisions.md spec assets"
 offenders=""
@@ -65,10 +100,25 @@ for entry in "$base"/*; do
 done
 [ -z "$offenders" ] || { echo "FAIL: loose files outside assets/:$offenders"; exit 1; }
 
+for file_name in spec.md tasks.md decisions.md; do
+  if [ -e "$base/$file_name" ] && [ ! -f "$base/$file_name" ]; then
+    echo "FAIL: $track $file_name must be a file"
+    exit 1
+  fi
+done
+for directory_name in spec assets; do
+  if [ -e "$base/$directory_name" ] && [ ! -d "$base/$directory_name" ]; then
+    echo "FAIL: $track $directory_name must be a directory"
+    exit 1
+  fi
+done
+
 spec="$base/spec.md"
 tasks="$base/tasks.md"
 [ -f "$spec" ] || { echo "FAIL: $track missing spec.md"; exit 1; }
 [ -f "$tasks" ] || { echo "FAIL: $track missing tasks.md"; exit 1; }
+require_frontmatter "$spec"
+require_frontmatter "$tasks"
 
 awk -v file="${spec#"$root"/}" '
   function report(message) { print "FAIL: " file ": " message; failed=1 }

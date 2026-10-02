@@ -324,6 +324,7 @@ run_init() {
   assert_contains "$init_skill" '../fast-track-ai-spec/scripts/fast-track-ai-gate.sh'
   assert_contains "$init_skill" 'yes-or-no question'
   assert_contains "$init_skill" 'assets/legacy/'
+  assert_contains "$init_skill" 'assets/legacy/decisions.md'
   assert_contains "$init_skill" 'Do not invent a Done, Files, Accept, Validate, or approval value'
 
   snippet="$repo_root/skills/fast-track-ai-init/assets/AGENTS-snippet.md"
@@ -331,6 +332,7 @@ run_init() {
   assert_not_contains "$snippet" 'Tasks parallelism'
   assert_not_contains "$snippet" 'Each script and template has one owner skill'
   assert_contains "$snippet" 'status: approved'
+  assert_not_contains "$snippet" 'decisions.md'
   assert_contains "$snippet" 'intent, spec, and implement end with a four-bullet summary'
 
   pass "init"
@@ -339,7 +341,8 @@ run_init() {
 run_index() {
   target="$work/index-target"
   "$init_script" "$target" >/dev/null
-  write_intent "$target" "001-example" "active"
+  write_intent "$target" "001-example" "draft"
+  write_intent "$target" "003-legacy-active" "active"
 
   inline_hash="$(printf 'inline fixture\n' | shasum -a 256 | awk '{print $1}')"
   cat >"$target/fast-track-ai/refs/inline-source.md" <<EOF
@@ -487,7 +490,8 @@ EOF
   write_handoff "$target/fast-track-ai/handoffs/archive/2026-09-20-1100--0300-archived.md" "2026-09-20T11:00:00-03:00" "archived"
 
   "$index_script" "$target" >/dev/null
-  assert_contains "$target/fast-track-ai/INDEX.md" "| 001-example | active |"
+  assert_contains "$target/fast-track-ai/INDEX.md" "| 001-example | draft |"
+  assert_contains "$target/fast-track-ai/INDEX.md" "| 003-legacy-active | active |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| inline-source | inline | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| inline-no-separator | inline | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| pinned-source | pointer | 2026-09-20 |"
@@ -516,7 +520,7 @@ EOF
   sed -i.bak "s/^sha256: $locator_hash$/sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/" "$target/fast-track-ai/refs/mutable-source.md"
   rm "$target/fast-track-ai/refs/mutable-source.md.bak"
 
-  sed -i.bak 's/^status: active$/status: unknown/' "$target/fast-track-ai/tracks/001-example/intent.md"
+  sed -i.bak 's/^status: draft$/status: unknown/' "$target/fast-track-ai/tracks/001-example/intent.md"
   expect_failure "index with invalid track status" "$index_script" "$target"
   assert_contains "$work/failure.err" "001-example invalid status: unknown"
   mv "$target/fast-track-ai/tracks/001-example/intent.md.bak" "$target/fast-track-ai/tracks/001-example/intent.md"
@@ -557,25 +561,25 @@ EOF
   mv "$target/fast-track-ai/tracks/001-example/intent.md.bak" "$target/fast-track-ai/tracks/001-example/intent.md"
 
   cp "$target/fast-track-ai/tracks/001-example/intent.md" "$work/intent-original.md"
-  awk '{ if ($0 == "status: active") { print "status: superseded"; print "superseded_by: 099-nowhere"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
+  awk '{ if ($0 == "status: draft") { print "status: superseded"; print "superseded_by: 099-nowhere"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
   expect_failure "index with missing intent replacement" "$index_script" "$target"
   assert_contains "$work/failure.err" "intent.md superseded_by references missing 099-nowhere"
   cp "$work/intent-original.md" "$target/fast-track-ai/tracks/001-example/intent.md"
 
-  awk '{ if ($0 == "status: active") { print; print "superseded_by: 001-example"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
+  awk '{ if ($0 == "status: draft") { print; print "superseded_by: 001-example"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
   expect_failure "index with self-replaced intent" "$index_script" "$target"
   assert_contains "$work/failure.err" "intent.md superseded_by has a self-reference"
   cp "$work/intent-original.md" "$target/fast-track-ai/tracks/001-example/intent.md"
 
   printf '# not an intent\n' >"$target/fast-track-ai/tracks/003-ghost.md"
-  awk '{ if ($0 == "status: active") { print "status: superseded"; print "superseded_by: 003-ghost"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
+  awk '{ if ($0 == "status: draft") { print "status: superseded"; print "superseded_by: 003-ghost"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
   expect_failure "index with loose track file as intent replacement" "$index_script" "$target"
   assert_contains "$work/failure.err" "intent.md superseded_by references missing 003-ghost"
   rm "$target/fast-track-ai/tracks/003-ghost.md"
   cp "$work/intent-original.md" "$target/fast-track-ai/tracks/001-example/intent.md"
 
   write_intent "$target" "002-replacement" "draft"
-  awk '{ if ($0 == "status: active") { print "status: superseded"; print "superseded_by: 002-replacement"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
+  awk '{ if ($0 == "status: draft") { print "status: superseded"; print "superseded_by: 002-replacement"; next } print }' "$work/intent-original.md" >"$target/fast-track-ai/tracks/001-example/intent.md"
   "$index_script" "$target" >/dev/null
   assert_contains "$target/fast-track-ai/INDEX.md" "| 001-example | superseded |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| 002-replacement | draft |"
@@ -998,6 +1002,15 @@ run_handoff() {
   assert_file "$target/fast-track-ai/handoffs/archive/2026-09-20-1000-+0200-first.md"
   assert_contains "$target/fast-track-ai/handoffs/archive/2026-09-20-1000-+0200-first.md" '> Preserve this exact instruction.'
   assert_not_matches "$repo_root/skills/fast-track-ai-handoff/SKILL.md" 'base `handoff`|base handoff skill|Run the base'
+  handoff_skill="$repo_root/skills/fast-track-ai-handoff/SKILL.md"
+  collision_line="$(grep -n 'Before writing, check that this path exists in neither' "$handoff_skill" | cut -d: -f1)"
+  write_line="$(grep -n 'Write the final document directly to that path' "$handoff_skill" | cut -d: -f1)"
+  validate_line="$(grep -n 'Validate the new handoff before touching any other handoff' "$handoff_skill" | cut -d: -f1)"
+  archive_line="$(grep -n 'Move each older handoff to `fast-track-ai/handoffs/archive/`' "$handoff_skill" | cut -d: -f1)"
+  index_line="$(grep -n 'run `../fast-track-ai-init/scripts/fast-track-ai-index.sh' "$handoff_skill" | cut -d: -f1)"
+  [ -n "$collision_line" ] && [ -n "$write_line" ] && [ -n "$validate_line" ] && [ -n "$archive_line" ] && [ -n "$index_line" ] || fail "handoff skill lacks a collision, write, validate, archive, or index step"
+  [ "$collision_line" -lt "$write_line" ] && [ "$write_line" -lt "$validate_line" ] || fail "handoff skill does not check collision, then write, then validate"
+  [ "$validate_line" -lt "$archive_line" ] && [ "$archive_line" -lt "$index_line" ] || fail "handoff skill does not validate, then archive, then index"
   "$index_script" "$target" >/dev/null
   assert_not_contains "$target/fast-track-ai/INDEX.md" '2026-09-20-1000-+0200-first'
   second_row="$(grep -nF '| 2026-09-20-0900-Z-second |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
@@ -1141,7 +1154,36 @@ EOF
 
   write_plan "$ok/fast-track-ai/tracks/003-example/plan.md" "approved"
   expect_failure "gate with leftover plan.md" "$gate" --track 003-example --root "$ok"
+  rm "$ok/fast-track-ai/tracks/003-example/plan.md"
 
+  root_dir="$ok/fast-track-ai/tracks/003-example"
+  for hidden_name in .notes .DS_Store; do
+    printf 'hidden\n' >"$root_dir/$hidden_name"
+    expect_failure "gate with hidden root entry $hidden_name" "$gate" --mode structure --track 003-example --root "$ok"
+    assert_contains "$work/failure.out" "hidden root entry: $hidden_name"
+    rm "$root_dir/$hidden_name"
+  done
+
+  printf 'not a directory\n' >"$root_dir/assets"
+  expect_failure "gate with file assets" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "assets must be a directory"
+  rm "$root_dir/assets"
+
+  printf 'not a directory\n' >"$root_dir/spec"
+  expect_failure "gate with file spec" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "spec must be a directory"
+  rm "$root_dir/spec"
+
+  mv "$root_dir/spec.md" "$work/spec-ok-spec.md"
+  mkdir "$root_dir/spec.md"
+  expect_failure "gate with directory spec.md" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "spec.md must be a file"
+  rmdir "$root_dir/spec.md"
+  mv "$work/spec-ok-spec.md" "$root_dir/spec.md"
+
+  printf '# Legacy decisions\n' >"$root_dir/decisions.md"
+  "$gate" --mode structure --track 003-example --root "$ok" >/dev/null
+  rm "$root_dir/decisions.md"
   spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
   spec_template="$repo_root/skills/fast-track-ai-spec/assets/spec.md"
   tasks_template="$repo_root/skills/fast-track-ai-spec/assets/tasks.md"
@@ -1151,6 +1193,7 @@ EOF
   assert_contains "$spec_skill" 'observable procedure with its expected observation'
   assert_contains "$spec_template" 'Done: the delivered, observable state when this phase closes.'
   assert_contains "$spec_template" 'Accept: the command with its expected result, or the observable procedure with its expected observation.'
+  assert_not_contains "$spec_template" 'decisions.md'
   assert_contains "$tasks_template" '(Phase 1):'
   assert_contains "$tasks_template" 'Validate: command or procedure with its expected result.'
 
@@ -1179,9 +1222,133 @@ run_flow() {
   assert_contains "$implement_skill" "continue from the first open task"
   assert_contains "$implement_skill" "record the divergence in the track's"
   assert_not_contains "$intent_skill" "Track concluida. Nenhuma implementacao necessaria."
+  assert_contains "$implement_skill" "provenance"
+  assert_contains "$implement_skill" "does not need"
+  assert_not_contains "$implement_skill" "pointer; do not vendor"
   assert_contains "$tasks_template" "## Group"
   assert_contains "$tasks_template" "(depends:"
   pass "flow"
+}
+
+check_no_live_active() {
+  package_root="$1"
+  for live_file in "$package_root"/skills/fast-track-ai-*/SKILL.md "$package_root"/skills/fast-track-ai-*/assets/* "$package_root"/commands/fast-track-ai-*.md; do
+    [ -f "$live_file" ] || continue
+    assert_not_contains "$live_file" 'status: active'
+  done
+}
+
+run_active() {
+  check_no_live_active "$repo_root"
+  assert_contains "$index_script" 'active is accepted only as a legacy value'
+  legacy_line="$(grep -n 'active is accepted only as a legacy value' "$index_script" | cut -d: -f1)"
+  case_line="$(grep -n 'case "$status" in draft|active|' "$index_script" | cut -d: -f1)"
+  [ "$((legacy_line + 1))" -eq "$case_line" ] || fail "legacy active comment is not directly above the intent status case"
+  pass "legacy active"
+}
+
+expect_index_frontmatter_rejection() {
+  target_root="$1"
+  expected="$2"
+  expect_failure "index rejecting frontmatter: $expected" "$index_script" "$target_root"
+  assert_contains "$work/failure.err" "$expected"
+  cmp "$work/frontmatter-index.before" "$target_root/fast-track-ai/INDEX.md" || fail "frontmatter rejection changed INDEX.md"
+}
+
+expect_gate_frontmatter_rejection() {
+  target_root="$1"
+  expected="$2"
+  expect_failure "gate rejecting frontmatter: $expected" "$gate" --mode structure --track 001-front --root "$target_root"
+  assert_contains "$work/failure.out" "$expected"
+}
+
+run_frontmatter() {
+  target="$work/frontmatter-target"
+  "$init_script" "$target" >/dev/null
+  track_dir="$target/fast-track-ai/tracks/001-front"
+  intent="$track_dir/intent.md"
+  write_intent "$target" "001-front" "draft"
+  write_spec "$track_dir/spec.md" "draft"
+  write_tasks "$track_dir/tasks.md" "draft" " "
+  research="$target/fast-track-ai/research/front-research.md"
+  cat >"$research" <<'EOF'
+---
+captured: 2026-09-20
+owner: maintainer
+---
+
+# Research: front
+
+## Question
+Fixture.
+
+## Conclusion
+Fixture.
+
+## Conflicts
+None.
+
+## Limitations
+Fixture.
+
+## Sources
+- Fixture.
+EOF
+  "$index_script" "$target" >/dev/null
+  "$gate" --mode structure --track 001-front --root "$target" >/dev/null
+  cp "$target/fast-track-ai/INDEX.md" "$work/frontmatter-index.before"
+  cp "$intent" "$work/frontmatter-intent.good"
+  cp "$research" "$work/frontmatter-research.good"
+  cp "$track_dir/spec.md" "$work/frontmatter-spec.good"
+  cp "$track_dir/tasks.md" "$work/frontmatter-tasks.good"
+  gate_intent="fast-track-ai/tracks/001-front/intent.md"
+
+  printf -- '---\nid: 001-front\nstatus: draft\n' >"$intent"
+  expect_index_frontmatter_rejection "$target" "001-front/intent.md frontmatter not closed"
+  expect_gate_frontmatter_rejection "$target" "FAIL: $gate_intent frontmatter not closed"
+
+  printf -- '---\nid: 001-front\nstatus: draft\nstatus: shipped\n---\n' >"$intent"
+  expect_index_frontmatter_rejection "$target" "001-front/intent.md duplicate frontmatter field status"
+  expect_gate_frontmatter_rejection "$target" "FAIL: $gate_intent duplicate frontmatter field status"
+
+  printf -- '---\nid: 001-front\nstatus: draft\nrefs:\n  - slug\n---\n' >"$intent"
+  expect_index_frontmatter_rejection "$target" "001-front/intent.md frontmatter line 5 is not a key: value field"
+  expect_gate_frontmatter_rejection "$target" "FAIL: $gate_intent frontmatter line 5 is not a key: value field"
+
+  printf -- '# Intent\n\n---\nid: 001-front\nstatus: draft\n---\n' >"$intent"
+  expect_index_frontmatter_rejection "$target" "001-front missing id field"
+  expect_gate_frontmatter_rejection "$target" "FAIL: intent without id"
+  cp "$work/frontmatter-intent.good" "$intent"
+
+  awk '{ print } $0 == "captured: 2026-09-20" { print "captured: 2026-09-21" }' "$work/frontmatter-research.good" >"$research"
+  expect_index_frontmatter_rejection "$target" "front-research.md duplicate frontmatter field captured"
+  cp "$work/frontmatter-research.good" "$research"
+
+  awk '{ print } $0 == "status: draft" { print "status: approved" }' "$work/frontmatter-spec.good" >"$track_dir/spec.md"
+  expect_gate_frontmatter_rejection "$target" "FAIL: fast-track-ai/tracks/001-front/spec.md duplicate frontmatter field status"
+  cp "$work/frontmatter-spec.good" "$track_dir/spec.md"
+
+  printf -- '---\nstatus: draft\n' >"$track_dir/tasks.md"
+  expect_gate_frontmatter_rejection "$target" "FAIL: fast-track-ai/tracks/001-front/tasks.md frontmatter not closed"
+  cp "$work/frontmatter-tasks.good" "$track_dir/tasks.md"
+
+  "$index_script" "$target" >/dev/null
+  "$gate" --mode structure --track 001-front --root "$target" >/dev/null
+
+  template_count=0
+  for template in "$repo_root"/skills/fast-track-ai-*/assets/*; do
+    [ -f "$template" ] || continue
+    [ "$(head -n 1 "$template")" = "---" ] || continue
+    template_count=$((template_count + 1))
+    cp "$template" "$target/fast-track-ai/research/template-check.md"
+    "$index_script" "$target" >/dev/null 2>"$work/template-check.err" || true
+    if grep -Eq 'frontmatter not closed|duplicate frontmatter field|frontmatter line [0-9]+ is not a key: value field' "$work/template-check.err"; then
+      fail "template frontmatter violates the canonical subset: $template"
+    fi
+  done
+  rm "$target/fast-track-ai/research/template-check.md"
+  [ "$template_count" -gt 0 ] || fail "no frontmatter templates found"
+  pass "frontmatter subset"
 }
 
 run_isolation() {
@@ -1209,13 +1376,15 @@ run_case() {
     handoff) run_handoff ;;
     spec) run_spec ;;
     flow) run_flow ;;
+    active) run_active ;;
+    frontmatter) run_frontmatter ;;
     isolation) run_isolation ;;
     *) fail "unknown eval: $1" ;;
   esac
 }
 
 if [ "$mode" = "all" ]; then
-  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow isolation; do
+  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow active frontmatter isolation; do
     if [ "$eval_name" = "isolation" ] && [ "${FAST_TRACK_AI_ISOLATION_GUARD:-}" = "1" ]; then
       continue
     fi
