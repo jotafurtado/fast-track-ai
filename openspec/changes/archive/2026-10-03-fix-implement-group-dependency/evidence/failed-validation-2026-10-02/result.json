@@ -1,0 +1,1 @@
+{"scenario":"failed-validation","result":"fail","reason":"dependent work started: farewell.txt exists (2 failed, 0 inconclusive; see assertions.log)","model":"","effort":"","timeoutSeconds":900}

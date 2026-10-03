@@ -25,7 +25,7 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | `decisions` | Intent distinguishes qualifying from local choices; evidence lives only in the `## Evidence` body; material planning-drift approval rules, immutable original ADR content, and `superseded_by` replacement are covered | 0 | PASS |
 | `handoff` | Four mixed legacy/new-format handoffs are ordered by captured instant; the oldest is archived, the newest three remain active, and the archive is absent from INDEX; the handoff skill orders its collision check, write, validation, archive, and index steps in that sequence | 0 | PASS |
 | `spec` | Structure checks require phases, non-empty phase fields, tasks, per-task fields, and valid unique acyclic groups; intent IDs must match track directories; ungrouped legacy tasks pass; hidden root entries and mistyped `assets`, `spec`, and `spec.md` fail while a legacy root `decisions.md` file passes; the spec template does not list `decisions.md` | 0 | PASS |
-| `flow` | Intent, spec, and implement skills plus the tasks template contain continuous-flow next-step lines, `## Group`, and `(depends:`, and the intent skill does not contain the retired exit line; the implement skill states proportional delegation, resume from the first open task, and the divergence stop, and names the code-review ref as provenance that the consuming project does not need | 0 | PASS |
+| `flow` | Intent, spec, and implement skills plus the tasks template contain continuous-flow next-step lines, `## Group`, and `(depends:`, and the intent skill does not contain the retired exit line; the implement skill states proportional delegation, resume from the first open task, the divergence stop, and that a dependent group's Files are not created, edited, or deleted before every prerequisite task has passed Validate and is checked, with a stop on a failed prerequisite, and names the code-review ref as provenance that the consuming project does not need | 0 | PASS |
 | `active` | No live skill, template, or command file contains `status: active`; the index script carries the legacy-only comment directly above its intent status `case` | 0 | PASS |
 | `frontmatter` | Index and gate reject the same malformed fixtures (unclosed block, duplicate key, indented list line) with the same rule text, a `---` pair below line 1 yields no fields, every index rejection leaves `INDEX.md` byte-identical, and every frontmatter template fits the canonical subset | 0 | PASS |
 | `isolation` | A copy of `skills/`, `commands/`, `install.sh`, `AGENTS.md`, and `evals/` without the `fast-track-ai/` tree passes `run-evals.sh all` | 0 | PASS |
@@ -148,3 +148,10 @@ Without `--keep-dir`, passing scenario directories are removed and non-passing o
 | `failed-validation` | fail | The agent kept both tasks open and recorded the divergence, but created `farewell.txt` for Task 2 before Group A passed |
 | `material-change` | pass | 6 assertions |
 | `resume` | pass | First product edit targeted `beta.txt`; `validate-alpha.sh` not rerun |
+
+2026-10-03, kiro-cli 2.27.1, Kiro default model and effort, 900 s per turn, after the implement skill gained the dependent-group rule (step 4). Two `failed-validation` runs, about 1.95 credits in total.
+
+| Run | Selector | Result | Credits | Note |
+|-----|----------|--------|---------|------|
+| 1 | `failed-validation` | pass | 1.09 | 9 assertions; `farewell.txt` absent and no edit action targeted it; both tasks open |
+| 2 | `failed-validation` | pass | 0.87 | 9 assertions; `farewell.txt` absent and no edit action targeted it; both tasks open |
