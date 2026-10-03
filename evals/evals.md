@@ -14,7 +14,7 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 
 | Selector | Observable Contract | Expected Exit | Result |
 |----------|---------------------|---------------|--------|
-| `self` | Runner and every published shell script pass `bash -n`; repository validation does not mask gate failures | 0 | PASS |
+| `self` | Runner and every published shell script, including the agent-eval runner and Kiro adapter, pass `bash -n`; repository validation does not mask gate failures; the agent-eval runner without a Kiro CLI reports `prerequisite-unavailable` for all six selectors and exits 0 without invoking Kiro | 0 | PASS |
 | `init` | Empty target receives the canonical tree; reruns are byte-identical; outdated managed blocks refresh without changing surrounding bytes; malformed markers fail before tree creation; symlink targets remain symlinked; the managed snippet states only the global contract and does not list `decisions.md`; the init skill reports non-conforming tracks and legacy root `decisions.md` files, asks before normalizing, and moves the legacy file to `assets/legacy/decisions.md` | 0 | PASS |
 | `index` | Valid artifacts and citation links appear in deterministic tables; the default intent fixture is `draft` and a dedicated `003-legacy-active` intent still indexes as `active`; handoffs sort by captured instant; new-format and legacy-format handoff headings are both accepted while a handoff with neither is rejected; orphan tracks, dangling citations/replacements, a loose `tracks/<id>.md` as intent replacement, malformed flow lists, invalid handoff timestamps, and more than three active handoffs fail without changing INDEX.md | 0 | PASS |
 | `approval` | Completion remains the default and requires approved artifacts and closed tasks; structure mode accepts draft/open tracks; unknown modes fail; leftover `plan.md` fails | 0 | PASS |
@@ -60,3 +60,91 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 ## Recorded Run
 
 `run-evals.sh all` completed with all fifteen selectors passing.
+
+## Agent Behavior Evals (Optional)
+
+`evals/run-agent-evals.sh` runs real Kiro agent sessions against disposable target repositories to check the continuous-flow protocol. It is maintainer-only, local, and explicit: `run-evals.sh all` never calls it, and none of its results affect the deterministic suite. Each run consumes Kiro credits.
+
+```bash
+bash evals/run-agent-evals.sh <selector> [--model MODEL] [--effort EFFORT] [--timeout SECONDS] [--keep-dir DIR]
+```
+
+Selectors: `compat`, `revision`, `approval`, `failed-validation`, `material-change`, `resume`, `all`.
+
+### Prerequisites
+
+- A Kiro CLI on `PATH` (or at `KIRO_CLI`) that is logged in: `kiro-cli whoami` must exit 0.
+- `jq`, `rsync`, `shasum`, and `git`.
+- Sessions run with `--trust-all-tools` inside the disposable workspace; run the suite only on a machine where that is acceptable.
+
+### Configuration
+
+| Input | Flag | Environment default | Default |
+|-------|------|---------------------|---------|
+| Model | `--model` | `FAST_TRACK_AI_AGENT_MODEL` | Kiro default |
+| Effort | `--effort` | `FAST_TRACK_AI_AGENT_EFFORT` | Kiro default |
+| Per-turn timeout in seconds; a scenario is bounded by turns times this value | `--timeout` | `FAST_TRACK_AI_AGENT_TIMEOUT` | 900 |
+| Kiro executable | none | `KIRO_CLI` | `kiro-cli` |
+| Diagnostic directory | `--keep-dir` | none | temporary directory |
+
+### Isolation
+
+Each scenario gets a fresh workspace: `fast-track-ai-init.sh`, the fixture overlay from `evals/agent/fixtures/<scenario>/workspace/`, `fast-track-ai-index.sh`, a copy of `skills/fast-track-ai-*` under `.kiro/skills/`, and a baseline git commit. No installed skill or command is required and the repository's `fast-track-ai/` tree is never read. The `compat` workspace is an empty git repository.
+
+The workspace is disposable, but Kiro still loads the maintainer's global configuration (for example steering and skills under `~/.kiro/`). That configuration can influence agent behavior and is not controlled by the runner; record it when comparing runs across machines.
+
+### Kiro Adapter
+
+`evals/agent/kiro-adapter.sh --workspace DIR --turns-dir DIR --out DIR [--model MODEL] [--effort EFFORT] [--timeout SECONDS]` runs `turn-NN.txt` files in order with `kiro-cli chat --output-format stream-json`. Turn 1 starts a session; each later turn uses `--resume-id` with the previous turn's session id. A turn that does not succeed stops the sequence. Evidence under `--out`:
+
+- `turns.jsonl`: one record per turn with `outcome` (`success`, `error`, `timeout`, `auth-failure`, `not-run`), `exitCode`, `sessionId`, `checkpoint`, `ordered` (stream had both `runStarted` and `runFinished`), `eventCount`, `actionCount`, and `credits`.
+- `turn-NN.events.jsonl` and `turn-NN.stderr`: raw Kiro output.
+- `turn-NN.actions.jsonl`: ordered tool calls with `seq`, `kind`, `tool`, workspace-relative `paths`, shell `command`, raw `input`, and final `status`.
+- `checkpoints/turn-NN/` and `checkpoints/turn-NN.manifest`: workspace snapshot and sha256 manifest after each turn, excluding `.git` and `.kiro`; `turn-00` is the baseline.
+
+Agent response text stays only in the raw events. No assertion reads it.
+
+### Scenarios
+
+Verdicts use only checkpoints, frontmatter, task checkboxes, command results, and recorded actions. A product path is any path outside `fast-track-ai/`, `.kiro/`, and `.git/`.
+
+| Selector | Fixture | Assertions |
+|----------|---------|------------|
+| `compat` | Turn 1 gives the token in `fixtures/compat/expected-token` and forbids file changes; turn 2 resumes and asks for `token.txt` with that token | Records `capability.json` as `supported` (same session id and the token written in turn 2), `unsupported`, `timeout`, or `auth-failure` |
+| `revision` | Intent for `greeting.txt`; turn 1 runs the spec skill, turn 2 is a revision | `spec.md` and `tasks.md` are `draft` after both turns, no product change at either checkpoint, no product edit action in turn 2, no checked task, intent not `shipped` |
+| `approval` | Same intent; turn 1 runs the spec skill, turn 2 is `.` | Both artifacts `draft` with no product change after turn 1 and `approved` after turn 2; the edit actions that write `status: approved` to both precede the first product edit action |
+| `failed-validation` | Approved track whose Task 1 Validate, `scripts/check-greeting.sh`, always exits 1; Task 2 in a dependent group | The Validate command ran; both tasks stay open; `farewell.txt` is absent and no edit action targets it; the script is unchanged; intent not `shipped`; `assets/acceptance.md` is absent or keeps a `pending` row, so ship was not offered; the completion gate rejects the track |
+| `material-change` | Approved `greeting.txt` track; the implement turn carries a final decision to deliver `greeting.json` instead | Both artifacts return to `draft`, no product change or product edit action, no checked task, intent not `shipped` |
+| `resume` | Approved track with Task 1 checked and Tasks 2 and 3 open in dependent groups; `scripts/validate-alpha.sh` leaves a marker when run | The marker is absent and no shell action runs `validate-alpha.sh`; `alpha.txt` is unchanged; Task 1 stays checked; the first product edit action targets `beta.txt` |
+
+`material-change` delivers the decision in the same turn that starts implementation, before any task begins. It approximates a decision made mid-implementation with one turn, which keeps cost and model variance low; a decision arriving after a task has started is not exercised.
+
+`revision`, `approval`, and `material-change` run only after `compat` reports `supported` in the same invocation; otherwise they report `inconclusive` (or `prerequisite-unavailable` on `auth-failure`) with the compat reason.
+
+### Results
+
+Each scenario prints `RESULT: <scenario> <classification>: <reason>`, followed by `SUMMARY:` with counts.
+
+- `pass`: every assertion held.
+- `fail`: at least one durable-state or recorded-action assertion did not hold.
+- `inconclusive`: unsupported continuation, timeout, a turn error, the model not reaching the state under test, or an order assertion without reliable evidence (incomplete event stream, product change made outside an edit action, approval written outside an edit action).
+- `prerequisite-unavailable`: missing Kiro CLI, failed `whoami`, or missing tool, checked before any scenario so none runs; or a Kiro auth failure during a turn, which classifies only that scenario.
+
+Exit code: 0 when no scenario failed, 1 when any scenario failed, 2 on a usage error. All classifications are non-blocking for `run-evals.sh all`.
+
+### Diagnostics
+
+Without `--keep-dir`, passing scenario directories are removed and non-passing ones are kept under a temporary root printed as `DIAGNOSTICS ROOT:`; the root is removed when everything passed. With `--keep-dir DIR`, every scenario directory is kept under `DIR/<scenario>/`. Each holds `workspace/`, `evidence/`, `adapter.log`, `assertions.log` (one `PASS`, `FAIL`, or `INCONCLUSIVE` line per assertion), and `result.json`.
+
+### Recorded Agent Run
+
+2026-10-02, kiro-cli 2.27.0, Kiro default model and effort, 900 s per turn, about 6.5 credits in total.
+
+| Selector | Result | Note |
+|----------|--------|------|
+| `compat` | pass | Headless `--resume-id` continuation supported |
+| `revision` | pass | 9 assertions |
+| `approval` | pass | Approval writes at seq 10 and 11, first product edit at seq 26 |
+| `failed-validation` | fail | The agent kept both tasks open and recorded the divergence, but created `farewell.txt` for Task 2 before Group A passed |
+| `material-change` | pass | 6 assertions |
+| `resume` | pass | First product edit targeted `beta.txt`; `validate-alpha.sh` not rerun |

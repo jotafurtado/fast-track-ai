@@ -1,0 +1,1 @@
+Create the file token.txt at the workspace root containing exactly the token I gave you in my previous message, on a single line, and nothing else. Do not search the filesystem for it.

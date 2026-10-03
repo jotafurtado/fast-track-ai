@@ -259,7 +259,12 @@ run_self() {
   bash -n "$init_script"
   bash -n "$index_script"
   bash -n "$gate"
+  bash -n "$repo_root/evals/run-agent-evals.sh"
+  bash -n "$repo_root/evals/agent/kiro-adapter.sh"
   assert_not_matches "$repo_root/AGENTS.md" 'fast-track-ai-gate\.sh.*\|\|[[:space:]]*true'
+  KIRO_CLI="$work/missing-kiro-cli" bash "$repo_root/evals/run-agent-evals.sh" all >"$work/agent-prereq.out" 2>&1 || fail "agent-eval runner without a Kiro CLI did not exit 0"
+  assert_contains "$work/agent-prereq.out" "RESULT: compat prerequisite-unavailable: Kiro CLI not found"
+  assert_contains "$work/agent-prereq.out" "prerequisite-unavailable=6"
   pass "runner self-check"
 }
 

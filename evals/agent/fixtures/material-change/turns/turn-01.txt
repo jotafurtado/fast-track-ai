@@ -1,0 +1,1 @@
+Run the fast-track-ai-implement skill for track 001-greeting in this repository. The skill is available under .kiro/skills/. Decision I am making now, and it is final: the greeting file must be `greeting.json` containing `{"greeting": "hello"}` instead of `greeting.txt`, because the smoke check now reads JSON.

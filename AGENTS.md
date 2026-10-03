@@ -10,7 +10,7 @@ Method `fast-track-ai`, a lightweight agent-driven SDLC. Binding norm lives in O
 - `skills/fast-track-ai-intent/` - SKILL.md plus `assets/` (`intent.md`, `ref.md`)
 - `skills/fast-track-ai-spec/` - SKILL.md plus `scripts/fast-track-ai-gate.sh` plus `assets/` (`spec.md`, `tasks.md`, `decisions.md`)
 - `skills/fast-track-ai-assess/`, `skills/fast-track-ai-research/`, and `skills/fast-track-ai-handoff/` - each owns its SKILL.md and artifact template; `skills/fast-track-ai-implement/` owns SKILL.md only
-- `evals/` - the self-contained maintainer eval suite (`run-evals.sh`, `evals.md`); not shipped by `install.sh`
+- `evals/` - the self-contained maintainer eval suite (`run-evals.sh`, `evals.md`) plus the optional Kiro agent-eval runner (`run-agent-evals.sh`, `agent/`); not shipped by `install.sh`
 
 Skills run against the target repo `fast-track-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `fast-track-ai-init` installs anything, through its own script path.
 
