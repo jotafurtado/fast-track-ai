@@ -151,8 +151,7 @@ for intent in "$ai"/tracks/*/intent.md; do
   [ -n "$id" ] || { fail "$track missing id field"; continue; }
   [ -n "$status" ] || { fail "$track missing status field"; continue; }
   [ "$id" = "$track" ] || fail "$track id mismatch: $id"
-  # active is accepted only as a legacy value from earlier package versions; no live skill writes it.
-  case "$status" in draft|active|shipped|dropped|superseded) ;; *) fail "$track invalid status: $status";; esac
+  case "$status" in draft|shipped|dropped|superseded) ;; *) fail "$track invalid status: $status";; esac
   for category in refs research assessments decisions; do
     validate_flow_list "$intent" "$category" "$category" "$(field "$intent" "$category" || true)"
   done
@@ -326,13 +325,7 @@ captured_epoch() {
     day_of_year=int((153*month_adjusted+2)/5)+day-1
     day_of_era=year_of_era*365+int(year_of_era/4)-int(year_of_era/100)+day_of_year
     days=era*146097+day_of_era-719468
-    offset=0
-    zone=substr(value,20)
-    if (zone != "Z") {
-      offset=(substr(zone,2,2)*3600)+(substr(zone,5,2)*60)
-      if (substr(zone,1,1) == "-") offset=-offset
-    }
-    print days*86400+hour*3600+minute*60+second-offset
+    print days*86400+hour*3600+minute*60+second
   }'
 }
 
@@ -349,19 +342,19 @@ if [ -d "$ai/handoffs" ]; then
     owner="$(field "$handoff" owner || true)"
     focus="$(field "$handoff" focus || true)"
     status="$(field "$handoff" status || true)"
-    new_format=0
+    name_ok=0
     if [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}Z-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
-      new_format=1
-    elif [[ ! "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}-(Z|[+-][0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
-      fail "$name invalid handoff filename; expected YYYY-MM-DD-HHmmssZ-slug.md or legacy YYYY-MM-DD-HHmm-OFFSET-slug.md"
+      name_ok=1
+    else
+      fail "$name invalid handoff filename; expected YYYY-MM-DD-HHmmssZ-slug.md"
     fi
-    if [[ ! "$captured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
-      fail "$name invalid captured timestamp"
+    if [[ ! "$captured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+      fail "$name invalid captured timestamp; expected YYYY-MM-DDTHH:MM:SSZ"
       epoch=0
     else
       epoch="$(captured_epoch "$captured")"
     fi
-    if [ "$new_format" = "1" ]; then
+    if [ "$name_ok" = "1" ]; then
       filename_instant="${stem:0:10}T${stem:11:2}:${stem:13:2}:${stem:15:2}Z"
       [ "$captured" = "$filename_instant" ] || fail "$name filename timestamp does not match captured $captured"
     fi
@@ -376,13 +369,7 @@ if [ -d "$ai/handoffs" ]; then
     require_heading "$handoff" "## Relevant paths and durable artifacts"
     require_heading "$handoff" "## Observed command results"
     require_heading "$handoff" "## Blockers and risks"
-    if grep -Fqx "## Next actions" "$handoff"; then
-      :
-    elif grep -Fqx "## P0 next actions" "$handoff" && grep -Fqx "## P1 next actions" "$handoff" && grep -Fqx "## First next action" "$handoff"; then
-      :
-    else
-      fail "$name missing heading ## Next actions"
-    fi
+    grep -Fqx "## Next actions" "$handoff" || fail "$name missing heading ## Next actions"
     handoff_sort_rows+=("$epoch"$'\t'"$name"$'\t'"$captured")
   done
 fi

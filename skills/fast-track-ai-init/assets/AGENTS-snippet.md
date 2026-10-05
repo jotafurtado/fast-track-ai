@@ -16,7 +16,7 @@ Supporting artifact locations:
 - A decision lives at `fast-track-ai/decisions/<NNN-slug>.md`.
 - A handoff lives at `fast-track-ai/handoffs/<timestamp>-<slug>.md`.
 
-- Track root holds only `intent.md`, `spec.md`, `tasks.md`, plus `assets/`. Live tracks must not keep `plan.md`. A leftover `spec/` directory is historical and does not select a cycle. Loose files are forbidden. Auxiliary outputs go under `assets/`.
+- Track root holds only `intent.md`, `spec.md`, `tasks.md`, and `assets/`. Loose files are forbidden. Auxiliary outputs go under `assets/`.
 - Intent stays `draft` until `shipped`, `dropped`, or `superseded`. `dropped` abandons the work; implementation is not required. `superseded` requires `superseded_by`. Do not invent `superseded_by`. Implement owns `shipped` and asks before writing it.
 
 <!-- END MANAGED BLOCK: fast-track-ai -->

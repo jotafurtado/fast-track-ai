@@ -113,60 +113,12 @@ status: $status
 
 # Tasks
 
+## Group A
 - [$checkbox] T001 Fixture. Files: fixture. Validate: true
 EOF
 }
 
 write_handoff() {
-  file="$1"
-  captured="$2"
-  focus="$3"
-  mkdir -p "$(dirname "$file")"
-  cat >"$file" <<EOF
----
-captured: $captured
-owner: maintainer
-focus: $focus
----
-
-# Handoff: $focus
-
-## Objective
-Fixture objective.
-
-## Active user instructions, verbatim
-> Preserve this exact instruction.
-
-## Current state
-Verified fixture state.
-
-## Completed
-- Fixture completed.
-
-## P0 next actions
-- Fixture P0.
-
-## P1 next actions
-- Fixture P1.
-
-## Unresolved decisions
-- None.
-
-## Relevant paths and durable artifacts
-- fast-track-ai/INDEX.md
-
-## Observed command results
-- Fixture command passed.
-
-## Blockers and risks
-- None known.
-
-## First next action
-Run the next fixture.
-EOF
-}
-
-write_handoff_new() {
   file="$1"
   captured="$2"
   focus="$3"
@@ -326,11 +278,8 @@ run_init() {
   cmp "$work/init-expected.md" "$symlinked/AGENTS.md" || fail "init did not update symlink target"
 
   init_skill="$repo_root/skills/fast-track-ai-init/SKILL.md"
-  assert_contains "$init_skill" '../fast-track-ai-spec/scripts/fast-track-ai-gate.sh'
-  assert_contains "$init_skill" 'yes-or-no question'
-  assert_contains "$init_skill" 'assets/legacy/'
-  assert_contains "$init_skill" 'assets/legacy/decisions.md'
-  assert_contains "$init_skill" 'Do not invent a Done, Files, Accept, Validate, or approval value'
+  assert_not_matches "$init_skill" 'assets/legac[y]|normaliz|conformance|non-conforming|yes-or-no question|fast-track-ai-gate'
+  assert_not_matches "$repo_root/commands/fast-track-ai-init.md" 'assets/legac[y]|normaliz|conformance|non-conforming|yes-or-no question'
 
   snippet="$repo_root/skills/fast-track-ai-init/assets/AGENTS-snippet.md"
   assert_not_contains "$snippet" 'Intent autonomy'
@@ -338,6 +287,8 @@ run_init() {
   assert_not_contains "$snippet" 'Each script and template has one owner skill'
   assert_contains "$snippet" 'status: approved'
   assert_not_contains "$snippet" 'decisions.md'
+  assert_not_contains "$snippet" 'plan.md'
+  assert_not_contains "$snippet" 'spec/'
   assert_contains "$snippet" 'intent, spec, and implement end with a four-bullet summary'
 
   pass "init"
@@ -347,7 +298,6 @@ run_index() {
   target="$work/index-target"
   "$init_script" "$target" >/dev/null
   write_intent "$target" "001-example" "draft"
-  write_intent "$target" "003-legacy-active" "active"
 
   inline_hash="$(printf 'inline fixture\n' | shasum -a 256 | awk '{print $1}')"
   cat >"$target/fast-track-ai/refs/inline-source.md" <<EOF
@@ -491,12 +441,11 @@ None.
 ## Consequences
 The decision is indexed.
 EOF
-  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-1200--0300-active.md" "2026-09-20T12:00:00-03:00" "active"
-  write_handoff "$target/fast-track-ai/handoffs/archive/2026-09-20-1100--0300-archived.md" "2026-09-20T11:00:00-03:00" "archived"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-150000Z-active.md" "2026-09-20T15:00:00Z" "active"
+  write_handoff "$target/fast-track-ai/handoffs/archive/2026-09-20-140000Z-archived.md" "2026-09-20T14:00:00Z" "archived"
 
   "$index_script" "$target" >/dev/null
   assert_contains "$target/fast-track-ai/INDEX.md" "| 001-example | draft |"
-  assert_contains "$target/fast-track-ai/INDEX.md" "| 003-legacy-active | active |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| inline-source | inline | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| inline-no-separator | inline | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| pinned-source | pointer | 2026-09-20 |"
@@ -504,8 +453,8 @@ EOF
   assert_contains "$target/fast-track-ai/INDEX.md" "| example-research | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-20-example-assessment | 2026-09-20 |"
   assert_contains "$target/fast-track-ai/INDEX.md" "| 001-example-decision | accepted |"
-  assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-20-1200--0300-active | 2026-09-20T12:00:00-03:00 |"
-  assert_not_contains "$target/fast-track-ai/INDEX.md" "2026-09-20-1100--0300-archived"
+  assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-20-150000Z-active | 2026-09-20T15:00:00Z |"
+  assert_not_contains "$target/fast-track-ai/INDEX.md" "2026-09-20-140000Z-archived"
   assert_not_contains "$target/fast-track-ai/INDEX.md" "| via |"
 
   cp "$target/fast-track-ai/INDEX.md" "$work/index-first.md"
@@ -530,6 +479,13 @@ EOF
   assert_contains "$work/failure.err" "001-example invalid status: unknown"
   mv "$target/fast-track-ai/tracks/001-example/intent.md.bak" "$target/fast-track-ai/tracks/001-example/intent.md"
 
+  cp "$target/fast-track-ai/INDEX.md" "$work/index-before-active.md"
+  sed -i.bak 's/^status: draft$/status: active/' "$target/fast-track-ai/tracks/001-example/intent.md"
+  expect_failure "index with active track status" "$index_script" "$target"
+  assert_contains "$work/failure.err" "001-example invalid status: active"
+  cmp "$work/index-before-active.md" "$target/fast-track-ai/INDEX.md" || fail "active status changed INDEX.md"
+  mv "$target/fast-track-ai/tracks/001-example/intent.md.bak" "$target/fast-track-ai/tracks/001-example/intent.md"
+
   sed -i.bak '/^captured:/d' "$target/fast-track-ai/research/example-research.md"
   expect_failure "index with invalid research" "$index_script" "$target"
   assert_contains "$work/failure.err" "example-research.md missing captured field"
@@ -545,10 +501,10 @@ EOF
   assert_contains "$work/failure.err" "001-example-decision.md invalid status: proposed"
   mv "$target/fast-track-ai/decisions/001-example-decision.md.bak" "$target/fast-track-ai/decisions/001-example-decision.md"
 
-  mv "$target/fast-track-ai/handoffs/2026-09-20-1200--0300-active.md" "$target/fast-track-ai/handoffs/bad-handoff.md"
+  mv "$target/fast-track-ai/handoffs/2026-09-20-150000Z-active.md" "$target/fast-track-ai/handoffs/bad-handoff.md"
   expect_failure "index with invalid handoff" "$index_script" "$target"
   assert_contains "$work/failure.err" "bad-handoff.md invalid handoff filename"
-  mv "$target/fast-track-ai/handoffs/bad-handoff.md" "$target/fast-track-ai/handoffs/2026-09-20-1200--0300-active.md"
+  mv "$target/fast-track-ai/handoffs/bad-handoff.md" "$target/fast-track-ai/handoffs/2026-09-20-150000Z-active.md"
 
   mkdir "$target/fast-track-ai/tracks/011-orphan"
   expect_failure "index with orphan track directory" "$index_script" "$target"
@@ -602,13 +558,13 @@ superseded_by: 001-example-decision/' "$target/fast-track-ai/decisions/001-examp
   expect_failure "index with self-replaced decision" "$index_script" "$target"
   assert_contains "$work/failure.err" "001-example-decision.md superseded_by has a self-reference"
   mv "$target/fast-track-ai/decisions/001-example-decision.md.bak" "$target/fast-track-ai/decisions/001-example-decision.md"
-  mv "$target/fast-track-ai/handoffs/2026-09-20-1200--0300-active.md" "$target/fast-track-ai/handoffs/archive/"
-  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-1000-+0200-a.md" "2026-09-21T10:00:00+02:00" "offset-a"
-  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-0930-Z-b.md" "2026-09-21T09:30:00Z" "offset-b"
+  mv "$target/fast-track-ai/handoffs/2026-09-20-150000Z-active.md" "$target/fast-track-ai/handoffs/archive/"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-080000Z-a.md" "2026-09-21T08:00:00Z" "utc-a"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-093000Z-b.md" "2026-09-21T09:30:00Z" "utc-b"
   write_handoff "$target/fast-track-ai/handoffs/2026-09-21-100000Z-valid.md" "2026-09-21T10:00:00Z" "new-format"
   "$index_script" "$target" >/dev/null
-  a_row="$(grep -nF '| 2026-09-21-1000-+0200-a |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
-  b_row="$(grep -nF '| 2026-09-21-0930-Z-b |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
+  a_row="$(grep -nF '| 2026-09-21-080000Z-a |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
+  b_row="$(grep -nF '| 2026-09-21-093000Z-b |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   [ "$a_row" -lt "$b_row" ] || fail "handoff rows are not ordered by captured instant"
   assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-21-100000Z-valid | 2026-09-21T10:00:00Z |"
   write_handoff "$target/fast-track-ai/handoffs/2026-09-22-100000Z-mismatch.md" "2026-09-22T10:00:01Z" "mismatch"
@@ -620,19 +576,56 @@ superseded_by: 001-example-decision/' "$target/fast-track-ai/decisions/001-examp
   assert_contains "$work/failure.err" "more than three handoffs are active"
   rm "$target/fast-track-ai/handoffs/2026-09-22-100000Z-fourth.md"
 
-  # A new-format (## Next actions) handoff is accepted alongside the legacy-heading fixtures.
+  # A handoff with ## Next actions is accepted.
   rm "$target/fast-track-ai/handoffs/2026-09-21-100000Z-valid.md"
-  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
   "$index_script" "$target" >/dev/null
   assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-21-100000Z-nextactions | 2026-09-21T10:00:00Z |"
 
-  # A handoff with neither heading set is rejected and leaves INDEX.md unchanged.
+  # A handoff without ## Next actions is rejected and leaves INDEX.md unchanged.
   cp "$target/fast-track-ai/INDEX.md" "$work/index-before-noactions.md"
   write_handoff_no_actions "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
   expect_failure "index with handoff missing next actions" "$index_script" "$target"
   assert_contains "$work/failure.err" "missing heading ## Next actions"
   cmp "$work/index-before-noactions.md" "$target/fast-track-ai/INDEX.md" || fail "rejected handoff changed INDEX.md"
-  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-21-100000Z-nextactions.md" "2026-09-21T10:00:00Z" "next-actions"
+
+  rm "$target/fast-track-ai/handoffs/2026-09-21-080000Z-a.md" "$target/fast-track-ai/handoffs/2026-09-21-093000Z-b.md"
+  "$index_script" "$target" >/dev/null
+  cp "$target/fast-track-ai/INDEX.md" "$work/index-before-retired-handoff.md"
+
+  # Offset names, minute-precision names, offset timestamps, and P0/P1 headings are rejected.
+  retired="$target/fast-track-ai/handoffs/2026-09-21-1000-+0200-offset.md"
+  write_handoff "$retired" "2026-09-21T10:00:00+02:00" "offset"
+  expect_failure "index with offset handoff name" "$index_script" "$target"
+  assert_contains "$work/failure.err" "2026-09-21-1000-+0200-offset.md invalid handoff filename"
+  assert_contains "$work/failure.err" "2026-09-21-1000-+0200-offset.md invalid captured timestamp"
+  cmp "$work/index-before-retired-handoff.md" "$target/fast-track-ai/INDEX.md" || fail "offset handoff name changed INDEX.md"
+  rm "$retired"
+
+  retired="$target/fast-track-ai/handoffs/2026-09-21-1000-Z-minute.md"
+  write_handoff "$retired" "2026-09-21T10:00:00Z" "minute"
+  expect_failure "index with minute-precision handoff name" "$index_script" "$target"
+  assert_contains "$work/failure.err" "2026-09-21-1000-Z-minute.md invalid handoff filename"
+  cmp "$work/index-before-retired-handoff.md" "$target/fast-track-ai/INDEX.md" || fail "minute-precision handoff name changed INDEX.md"
+  rm "$retired"
+
+  retired="$target/fast-track-ai/handoffs/2026-09-21-080000Z-offcap.md"
+  write_handoff "$retired" "2026-09-21T10:00:00+02:00" "offcap"
+  expect_failure "index with offset captured timestamp" "$index_script" "$target"
+  assert_contains "$work/failure.err" "2026-09-21-080000Z-offcap.md invalid captured timestamp"
+  cmp "$work/index-before-retired-handoff.md" "$target/fast-track-ai/INDEX.md" || fail "offset captured changed INDEX.md"
+  rm "$retired"
+
+  retired="$target/fast-track-ai/handoffs/2026-09-21-090000Z-priority.md"
+  write_handoff "$retired" "2026-09-21T09:00:00Z" "priority"
+  sed -i.bak 's/^## Next actions$/## P0 next actions/' "$retired"
+  rm "$retired.bak"
+  printf '\n## P1 next actions\n- Fixture.\n\n## First next action\nRun it.\n' >>"$retired"
+  expect_failure "index with P0/P1 handoff headings" "$index_script" "$target"
+  assert_contains "$work/failure.err" "2026-09-21-090000Z-priority.md missing heading ## Next actions"
+  cmp "$work/index-before-retired-handoff.md" "$target/fast-track-ai/INDEX.md" || fail "P0/P1 handoff changed INDEX.md"
+  rm "$retired"
 
   "$index_script" "$target" >/dev/null
   cp "$target/fast-track-ai/INDEX.md" "$work/index-before-invalid.md"
@@ -685,7 +678,31 @@ run_approval() {
   "$gate" --track 001-example --root "$short" >/dev/null
 
   write_plan "$short/fast-track-ai/tracks/001-example/plan.md" "approved"
-  expect_failure "gate with leftover plan.md" "$gate" --track 001-example --root "$short"
+  expect_failure "gate with root plan.md" "$gate" --track 001-example --root "$short"
+  assert_contains "$work/failure.out" "loose files outside assets/: plan.md"
+  rm "$short/fast-track-ai/tracks/001-example/plan.md"
+
+  printf '# Decisions\n' >"$short/fast-track-ai/tracks/001-example/decisions.md"
+  expect_failure "gate with root decisions.md" "$gate" --track 001-example --root "$short"
+  assert_contains "$work/failure.out" "loose files outside assets/: decisions.md"
+  rm "$short/fast-track-ai/tracks/001-example/decisions.md"
+
+  mkdir "$short/fast-track-ai/tracks/001-example/spec"
+  expect_failure "gate with spec directory" "$gate" --track 001-example --root "$short"
+  assert_contains "$work/failure.out" "loose files outside assets/: spec"
+  rmdir "$short/fast-track-ai/tracks/001-example/spec"
+
+  cat >"$short/fast-track-ai/tracks/001-example/tasks.md" <<'EOF'
+---
+status: approved
+---
+
+# Tasks
+
+- [x] T001 Fixture. Files: fixture. Validate: true
+EOF
+  expect_failure "gate with ungrouped tasks" "$gate" --track 001-example --root "$short"
+  assert_contains "$work/failure.out" "tasks.md has no group header"
   pass "approval gate"
 }
 
@@ -805,8 +822,7 @@ run_workflows() {
     assert_contains "$handoff_template" "$heading"
   done
   assert_not_matches "$handoff_template" '^status:'
-  assert_not_contains "$handoff_template" '## P0 next actions'
-  assert_not_contains "$handoff_template" '## First next action'
+  assert_not_matches "$handoff_template" '^## (P0|P1) next actions$|^## First next action$'
 
   for package_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md "$repo_root"/commands/fast-track-ai-*.md; do
     assert_not_matches "$package_file" 'Jhony Walker|jhonywalkeer|Guia Completo sobre Architecture'
@@ -996,16 +1012,16 @@ EOF
 run_handoff() {
   target="$work/handoff-target"
   "$init_script" "$target" >/dev/null
-  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-1000-+0200-first.md" "2026-09-20T10:00:00+02:00" "first"
-  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-0900-Z-second.md" "2026-09-20T09:00:00Z" "second"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-080000Z-first.md" "2026-09-20T08:00:00Z" "first"
+  write_handoff "$target/fast-track-ai/handoffs/2026-09-20-090000Z-second.md" "2026-09-20T09:00:00Z" "second"
   write_handoff "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md" "2026-09-20T10:00:00Z" "third"
   write_handoff "$target/fast-track-ai/handoffs/2026-09-20-110000Z-fourth.md" "2026-09-20T11:00:00Z" "fourth"
-  mv "$target/fast-track-ai/handoffs/2026-09-20-1000-+0200-first.md" "$target/fast-track-ai/handoffs/archive/"
+  mv "$target/fast-track-ai/handoffs/2026-09-20-080000Z-first.md" "$target/fast-track-ai/handoffs/archive/"
 
   active_handoffs=("$target"/fast-track-ai/handoffs/*.md)
   [ "${#active_handoffs[@]}" -eq 3 ] || fail "handoff fixture did not retain exactly three active files"
-  assert_file "$target/fast-track-ai/handoffs/archive/2026-09-20-1000-+0200-first.md"
-  assert_contains "$target/fast-track-ai/handoffs/archive/2026-09-20-1000-+0200-first.md" '> Preserve this exact instruction.'
+  assert_file "$target/fast-track-ai/handoffs/archive/2026-09-20-080000Z-first.md"
+  assert_contains "$target/fast-track-ai/handoffs/archive/2026-09-20-080000Z-first.md" '> Preserve this exact instruction.'
   assert_not_matches "$repo_root/skills/fast-track-ai-handoff/SKILL.md" 'base `handoff`|base handoff skill|Run the base'
   handoff_skill="$repo_root/skills/fast-track-ai-handoff/SKILL.md"
   collision_line="$(grep -n 'Before writing, check that this path exists in neither' "$handoff_skill" | cut -d: -f1)"
@@ -1017,15 +1033,13 @@ run_handoff() {
   [ "$collision_line" -lt "$write_line" ] && [ "$write_line" -lt "$validate_line" ] || fail "handoff skill does not check collision, then write, then validate"
   [ "$validate_line" -lt "$archive_line" ] && [ "$archive_line" -lt "$index_line" ] || fail "handoff skill does not validate, then archive, then index"
   "$index_script" "$target" >/dev/null
-  assert_not_contains "$target/fast-track-ai/INDEX.md" '2026-09-20-1000-+0200-first'
-  second_row="$(grep -nF '| 2026-09-20-0900-Z-second |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
+  assert_not_contains "$target/fast-track-ai/INDEX.md" '2026-09-20-080000Z-first'
+  second_row="$(grep -nF '| 2026-09-20-090000Z-second |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   third_row="$(grep -nF '| 2026-09-20-100000Z-third |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   fourth_row="$(grep -nF '| 2026-09-20-110000Z-fourth |' "$target/fast-track-ai/INDEX.md" | cut -d: -f1)"
   [ "$second_row" -lt "$third_row" ] && [ "$third_row" -lt "$fourth_row" ] || fail "handoffs are not ordered by captured instant"
 
-  # A new-format handoff is accepted, and one with neither heading set is rejected without changing INDEX.
-  rm "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md"
-  write_handoff_new "$target/fast-track-ai/handoffs/2026-09-20-100000Z-third.md" "2026-09-20T10:00:00Z" "third-new"
+  # A handoff without ## Next actions is rejected without changing INDEX.
   "$index_script" "$target" >/dev/null
   assert_contains "$target/fast-track-ai/INDEX.md" "| 2026-09-20-100000Z-third | 2026-09-20T10:00:00Z |"
   cp "$target/fast-track-ai/INDEX.md" "$work/handoff-index-before.md"
@@ -1048,6 +1062,7 @@ run_spec() {
   printf '# Spec\n' >"$leftover/fast-track-ai/tracks/002-example/spec/spec.md"
   write_tasks "$leftover/fast-track-ai/tracks/002-example/spec/tasks.md" "approved" "x"
   expect_failure "gate with spec/ and no root spec.md" "$gate" --track 002-example --root "$leftover"
+  assert_contains "$work/failure.out" "loose files outside assets/: spec"
 
   ok="$work/spec-ok"
   write_intent "$ok" "003-example" "draft"
@@ -1097,7 +1112,7 @@ EOF
 - [ ] Missing Validate. Files: fixture
 EOF
   expect_failure "gate with task missing Validate" "$gate" --mode structure --track 003-example --root "$ok"
-  assert_contains "$work/failure.out" "line 8 task missing or empty Validate:"
+  assert_contains "$work/failure.out" "line 9 task missing or empty Validate:"
 
   cat >"$ok/fast-track-ai/tracks/003-example/tasks.md" <<'EOF'
 ---
@@ -1154,11 +1169,23 @@ EOF
   expect_failure "gate with task before first group" "$gate" --mode structure --track 003-example --root "$ok"
   assert_contains "$work/failure.out" "task appears before first group header"
 
+  cat >"$ok/fast-track-ai/tracks/003-example/tasks.md" <<'EOF'
+---
+status: draft
+---
+- [ ] Ungrouped. Files: fixture Validate: fixture
+EOF
+  expect_failure "gate with ungrouped tasks" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "tasks.md has no group header"
+  expect_failure "gate completion with ungrouped tasks" "$gate" --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "tasks.md has no group header"
+
   write_tasks "$ok/fast-track-ai/tracks/003-example/tasks.md" "draft" "x"
   "$gate" --mode structure --track 003-example --root "$ok" >/dev/null
 
   write_plan "$ok/fast-track-ai/tracks/003-example/plan.md" "approved"
-  expect_failure "gate with leftover plan.md" "$gate" --track 003-example --root "$ok"
+  expect_failure "gate with root plan.md" "$gate" --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "loose files outside assets/: plan.md"
   rm "$ok/fast-track-ai/tracks/003-example/plan.md"
 
   root_dir="$ok/fast-track-ai/tracks/003-example"
@@ -1176,8 +1203,13 @@ EOF
 
   printf 'not a directory\n' >"$root_dir/spec"
   expect_failure "gate with file spec" "$gate" --mode structure --track 003-example --root "$ok"
-  assert_contains "$work/failure.out" "spec must be a directory"
+  assert_contains "$work/failure.out" "loose files outside assets/: spec"
   rm "$root_dir/spec"
+
+  mkdir "$root_dir/spec"
+  expect_failure "gate with spec directory" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "loose files outside assets/: spec"
+  rmdir "$root_dir/spec"
 
   mv "$root_dir/spec.md" "$work/spec-ok-spec.md"
   mkdir "$root_dir/spec.md"
@@ -1186,8 +1218,9 @@ EOF
   rmdir "$root_dir/spec.md"
   mv "$work/spec-ok-spec.md" "$root_dir/spec.md"
 
-  printf '# Legacy decisions\n' >"$root_dir/decisions.md"
-  "$gate" --mode structure --track 003-example --root "$ok" >/dev/null
+  printf '# Decisions\n' >"$root_dir/decisions.md"
+  expect_failure "gate with root decisions.md" "$gate" --mode structure --track 003-example --root "$ok"
+  assert_contains "$work/failure.out" "loose files outside assets/: decisions.md"
   rm "$root_dir/decisions.md"
   spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
   spec_template="$repo_root/skills/fast-track-ai-spec/assets/spec.md"
@@ -1199,6 +1232,7 @@ EOF
   assert_contains "$spec_template" 'Done: the delivered, observable state when this phase closes.'
   assert_contains "$spec_template" 'Accept: the command with its expected result, or the observable procedure with its expected observation.'
   assert_not_contains "$spec_template" 'decisions.md'
+  assert_not_contains "$spec_template" 'plan.md'
   assert_contains "$tasks_template" '(Phase 1):'
   assert_contains "$tasks_template" 'Validate: command or procedure with its expected result.'
 
@@ -1248,11 +1282,18 @@ check_no_live_active() {
 
 run_active() {
   check_no_live_active "$repo_root"
-  assert_contains "$index_script" 'active is accepted only as a legacy value'
-  legacy_line="$(grep -n 'active is accepted only as a legacy value' "$index_script" | cut -d: -f1)"
-  case_line="$(grep -n 'case "$status" in draft|active|' "$index_script" | cut -d: -f1)"
-  [ "$((legacy_line + 1))" -eq "$case_line" ] || fail "legacy active comment is not directly above the intent status case"
-  pass "legacy active"
+  assert_not_matches "$index_script" 'legacy'
+  active_target="$work/active-target"
+  "$init_script" "$active_target" >/dev/null
+  write_intent "$active_target" "001-example" "draft"
+  "$index_script" "$active_target" >/dev/null
+  cp "$active_target/fast-track-ai/INDEX.md" "$work/index-before-active-intent.md"
+  write_intent "$active_target" "001-example" "active"
+  expect_failure "index with active intent" "$index_script" "$active_target"
+  assert_contains "$work/failure.err" "001-example invalid status: active"
+  assert_contains "$work/failure.err" "INDEX not updated"
+  cmp "$work/index-before-active-intent.md" "$active_target/fast-track-ai/INDEX.md" || fail "active intent changed INDEX.md"
+  pass "active status rejected"
 }
 
 expect_index_frontmatter_rejection() {

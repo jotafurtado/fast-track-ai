@@ -74,11 +74,6 @@ id="$(frontmatter_field "$intent" id)"
 [ -n "$id" ] || { echo "FAIL: intent without id"; exit 1; }
 [ "$id" = "$track" ] || { echo "FAIL: intent id mismatch: $id (expected $track)"; exit 1; }
 
-if [ -e "$base/plan.md" ]; then
-  echo "FAIL: $track has plan.md; live tracks must not keep plan.md"
-  exit 1
-fi
-
 hidden=0
 for entry in "$base"/.[!.]* "$base"/..?*; do
   [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -87,7 +82,7 @@ for entry in "$base"/.[!.]* "$base"/..?*; do
 done
 [ "$hidden" = "0" ] || exit 1
 
-allowed="intent.md spec.md tasks.md decisions.md spec assets"
+allowed="intent.md spec.md tasks.md assets"
 offenders=""
 for entry in "$base"/*; do
   [ -e "$entry" ] || continue
@@ -100,13 +95,13 @@ for entry in "$base"/*; do
 done
 [ -z "$offenders" ] || { echo "FAIL: loose files outside assets/:$offenders"; exit 1; }
 
-for file_name in spec.md tasks.md decisions.md; do
+for file_name in spec.md tasks.md; do
   if [ -e "$base/$file_name" ] && [ ! -f "$base/$file_name" ]; then
     echo "FAIL: $track $file_name must be a file"
     exit 1
   fi
 done
-for directory_name in spec assets; do
+for directory_name in assets; do
   if [ -e "$base/$directory_name" ] && [ ! -d "$base/$directory_name" ]; then
     echo "FAIL: $track $directory_name must be a directory"
     exit 1
@@ -213,7 +208,8 @@ awk -v file="${tasks#"$root"/}" '
   }
   END {
     if (!task_count) report("tasks file has no task lines")
-    if (header_count && task_before_header) report("line " task_before_header " task appears before first group header")
+    if (!header_count) report("tasks.md has no group header")
+    if (task_before_header) report("line " task_before_header " task appears before first group header")
     for (group in groups) {
       count=split(pending[group], deps, ",")
       for (i=1; i<=count && pending[group] != ""; i++) {

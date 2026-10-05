@@ -26,14 +26,13 @@ Structure mode SHALL fail when:
 - `intent.md` is missing.
 - `intent.md`, or a present `spec.md` or `tasks.md`, has frontmatter that violates the canonical subset defined by the `method-artifacts` capability.
 - The intent `id` differs from the track directory name.
-- `plan.md` exists.
 - A root entry whose name starts with `.` exists. `.` and `..` are not entries.
-- A root entry falls outside `intent.md`, `spec.md`, `tasks.md`, `decisions.md`, `spec`, and `assets`.
-- `intent.md`, `spec.md`, `tasks.md`, or `decisions.md` exists and is not a regular file.
-- `spec` or `assets` exists and is not a directory.
+- A root entry falls outside `intent.md`, `spec.md`, `tasks.md`, and `assets`.
+- `intent.md`, `spec.md`, or `tasks.md` exists and is not a regular file.
+- `assets` exists and is not a directory.
 - `spec.md` or `tasks.md` is missing.
 
-`decisions.md` at the track root is accepted only for tracks created before it was retired from the contract. No live template or managed block lists it.
+Retired entries such as `plan.md`, `decisions.md`, or a `spec/` directory SHALL fail under the unexpected-entry rule, with no dedicated message.
 
 Each failure SHALL print one `FAIL:` line that names the offending entry or file and the violated rule.
 
@@ -42,8 +41,8 @@ Each failure SHALL print one `FAIL:` line that names the offending entry or file
 - **THEN** structure mode exits non-zero and names the mismatched id
 
 #### Scenario: Leftover plan.md
-- **WHEN** a track root contains `plan.md`
-- **THEN** structure mode exits non-zero with the existing leftover `plan.md` message
+- **WHEN** an otherwise valid track root contains `plan.md`
+- **THEN** structure mode exits non-zero and names `plan.md` as an entry outside the allowed set
 
 #### Scenario: Hidden root entry
 - **WHEN** a track root contains `.notes` or `.DS_Store`, and the track is otherwise valid
@@ -55,7 +54,11 @@ Each failure SHALL print one `FAIL:` line that names the offending entry or file
 
 #### Scenario: Legacy root decisions file
 - **WHEN** an otherwise valid track root contains a regular file `decisions.md`
-- **THEN** structure mode passes
+- **THEN** structure mode exits non-zero and names `decisions.md` as an entry outside the allowed set
+
+#### Scenario: Retired spec directory
+- **WHEN** an otherwise valid track root contains a `spec/` directory
+- **THEN** structure mode exits non-zero and names `spec` as an entry outside the allowed set
 
 #### Scenario: Duplicate field in spec frontmatter
 - **WHEN** `spec.md` frontmatter declares `status:` twice
@@ -77,13 +80,12 @@ Each failure SHALL print one `FAIL:` line that names the offending entry or file
 - **THEN** structure mode exits non-zero and names phase 2 and the empty `Accept:` field
 
 ### Requirement: Structure mode validates every task and group
-A task line SHALL start with `- [ ] ` or `- [x] `. `tasks.md` SHALL contain at least one task line. Each task line SHALL contain `Files:` and `Validate:`, each followed by non-whitespace text. When `tasks.md` contains `## Group <name>` headers, the following SHALL hold:
+A task line SHALL start with `- [ ] ` or `- [x] `. `tasks.md` SHALL contain at least one task line and at least one `## Group <name>` header, and the following SHALL hold:
+- Each task line contains `Files:` and `Validate:`, each followed by non-whitespace text.
+- No task line appears before the first group header.
 - Group names are unique.
 - Every name listed in a `(depends: <name>[, <name>])` annotation is an existing group other than the group itself.
 - The dependency graph has no cycle.
-- No task line appears before the first group header.
-
-A `tasks.md` without group headers SHALL be treated as a single implicit group, so tracks shipped before groups existed remain valid.
 
 #### Scenario: Tasks file without tasks
 - **WHEN** `tasks.md` contains `Files:` and `Validate:` text but no task line
@@ -102,8 +104,12 @@ A `tasks.md` without group headers SHALL be treated as a single implicit group, 
 - **THEN** structure mode exits non-zero and reports a dependency cycle involving `A` and `B`
 
 #### Scenario: Legacy tasks without groups
-- **WHEN** a shipped track's `tasks.md` has closed task lines with Files and Validate and no group headers
-- **THEN** structure mode and completion mode both accept the group layout
+- **WHEN** `tasks.md` has valid task lines with Files and Validate and no `## Group` header
+- **THEN** structure mode and completion mode both exit non-zero and report that `tasks.md` has no group header
+
+#### Scenario: Single-task group
+- **WHEN** `tasks.md` has one `## Group A` header followed by one valid task line
+- **THEN** structure mode accepts the group layout
 
 ### Requirement: Completion mode requires approval and closed tasks
 After the structure checks pass, completion mode SHALL require frontmatter `status: approved` in both `spec.md` and `tasks.md` and SHALL fail while any task line is `- [ ] `. On success it SHALL print `PASS: <track> cycle intact`.
@@ -117,8 +123,8 @@ After the structure checks pass, completion mode SHALL require frontmatter `stat
 - **THEN** completion mode exits non-zero and reports the open task count
 
 #### Scenario: Shipped unified-spec tracks keep passing
-- **WHEN** completion mode runs on this repository's tracks `008-unified-spec`, `009-track-terminal-states`, and `010-approval-ask-not-gate-fail`
-- **THEN** each exits 0
+- **WHEN** completion mode runs on a scratch track whose `spec.md` and `tasks.md` are filled from the current package templates, approved, and closed
+- **THEN** it exits 0, and no gate scenario depends on tracks stored in this repository
 
 ### Requirement: Spec skill drafts against structure mode
 The spec skill SHALL run the owner gate with `--mode structure` after writing `spec.md` and `tasks.md` and SHALL report any failure as breakage to fix. It SHALL NOT instruct the agent to disregard gate failures. The implement skill SHALL continue to run the gate in completion mode.

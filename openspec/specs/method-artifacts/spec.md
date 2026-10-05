@@ -189,9 +189,9 @@ To replace an ADR, the workflow SHALL:
 ### Requirement: Handoffs transfer portable working context
 A handoff action SHALL write directly to `fast-track-ai/handoffs/<timestamp>-<slug>.md`, preserve the user's exact active instructions, summarize objective and current state, identify completed work, list next actions in one ordered `## Next actions` list whose first item is the first concrete step, list relevant paths and observed command results, and disclose blockers and risks. It SHALL reference durable artifacts by path instead of duplicating them and SHALL omit secrets and unnecessary personal data.
 
-Index generation SHALL accept a handoff that has `## Next actions`. It SHALL also accept a legacy handoff that has `## P0 next actions`, `## P1 next actions`, and `## First next action` in its place. It SHALL reject a handoff that has neither set.
+Index generation SHALL require `## Next actions` and SHALL reject a handoff without it, including one that carries `## P0 next actions`, `## P1 next actions`, and `## First next action` instead.
 
-New handoffs SHALL use a UTC timestamp with seconds: filename prefix `YYYY-MM-DD-HHmmssZ` and `captured: YYYY-MM-DDTHH:MM:SSZ`, both naming the same instant. Legacy `YYYY-MM-DD-HHmm-OFFSET` filenames remain valid. Active handoffs SHALL be ordered by the instant in `captured`, never by filename text, and the action SHALL NOT overwrite an existing handoff in either the active directory or archive.
+Handoffs SHALL use a UTC timestamp with seconds: filename prefix `YYYY-MM-DD-HHmmssZ` and `captured: YYYY-MM-DDTHH:MM:SSZ`, both naming the same instant. Index generation SHALL reject any other filename or `captured` form, including minute-precision names and numeric offsets. Active handoffs SHALL be ordered by the instant in `captured`, and the action SHALL NOT overwrite an existing handoff in either the active directory or archive.
 
 The action SHALL run in this order:
 1. Check that the computed path exists in neither the active directory nor the archive.
@@ -208,10 +208,10 @@ When step 3 fails, the action SHALL fix the new handoff or stop and report the f
 
 #### Scenario: Legacy handoff headings
 - **WHEN** an active handoff has P0, P1, and First next action headings and no `## Next actions`
-- **THEN** index generation accepts it
+- **THEN** index generation exits unsuccessfully and names the handoff and the missing `## Next actions` heading
 
 #### Scenario: Handoff without next actions
-- **WHEN** an active handoff has neither `## Next actions` nor the legacy set
+- **WHEN** an active handoff has no `## Next actions` heading
 - **THEN** index generation exits unsuccessfully and names the handoff and the missing heading
 
 #### Scenario: Handoff history exceeds the active limit
@@ -223,8 +223,8 @@ When step 3 fails, the action SHALL fix the new handoff or stop and report the f
 - **THEN** no older handoff moves to the archive and the index is not run until the new handoff is fixed
 
 #### Scenario: Offsets disagree with filename order
-- **WHEN** active handoffs are `2026-09-21-1000-+0200-a.md` captured `2026-09-21T10:00:00+02:00` and `2026-09-21-0930-Z-b.md` captured `2026-09-21T09:30:00Z`
-- **THEN** `a` is treated as older than `b`
+- **WHEN** an active handoff is named `2026-09-21-1000-+0200-a.md` with `captured: 2026-09-21T10:00:00+02:00`
+- **THEN** index generation exits unsuccessfully and names the invalid filename and the invalid `captured` form
 
 #### Scenario: Destination already exists
 - **WHEN** the computed handoff path, or the archive path for a handoff being moved, already exists
@@ -237,7 +237,7 @@ When step 3 fails, the action SHALL fix the new handoff or stop and report the f
 ### Requirement: Index discovers and validates all artifact types
 The generated `fast-track-ai/INDEX.md` SHALL list tracks plus active refs, research, assessments, decisions, and handoffs in deterministic order. Active handoffs SHALL be listed by ascending `captured` instant. Index generation SHALL validate each artifact's required metadata, filename rules, permitted lifecycle fields, size constraints, and type-specific invariants, and SHALL fail with an objective artifact-specific error when validation fails.
 
-Index generation SHALL also validate that every track directory contains an `intent.md`; every slug in an intent's `refs`, `research`, `assessments`, and `decisions` flow lists names an existing artifact in that category; every `superseded_by` on an intent or decision names an existing artifact of the same type other than itself; new-format handoff filename timestamps match their `captured` instants; and no more than three handoffs are active.
+Index generation SHALL also validate that every track directory contains an `intent.md`; every slug in an intent's `refs`, `research`, `assessments`, and `decisions` flow lists names an existing artifact in that category; every `superseded_by` on an intent or decision names an existing artifact of the same type other than itself; every handoff filename timestamp matches its `captured` instant; and no more than three handoffs are active.
 
 When validation fails, index generation SHALL exit unsuccessfully, name the file and violated rule, leave any existing `INDEX.md` unchanged, and state that the index was not updated. On success it SHALL replace `INDEX.md` atomically.
 
