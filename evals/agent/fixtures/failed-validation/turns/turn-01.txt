@@ -1,1 +1,1 @@
-Run the fast-track-ai-implement skill for track 001-greeting in this repository. The skill is available under .kiro/skills/.
+Run the fast-track-ai-implement skill for track 001-greeting in this repository.

@@ -10,7 +10,9 @@ Method `fast-track-ai`, a lightweight agent-driven SDLC. Binding norm lives in O
 - `skills/fast-track-ai-intent/` - SKILL.md plus `assets/` (`intent.md`, `ref.md`)
 - `skills/fast-track-ai-spec/` - SKILL.md plus `scripts/fast-track-ai-gate.sh` plus `assets/` (`spec.md`, `tasks.md`, `decisions.md`)
 - `skills/fast-track-ai-assess/`, `skills/fast-track-ai-research/`, and `skills/fast-track-ai-handoff/` - each owns its SKILL.md and artifact template; `skills/fast-track-ai-implement/` owns SKILL.md only
-- `evals/` - the self-contained maintainer eval suite (`run-evals.sh`, `evals.md`) plus the optional Kiro agent-eval runner (`run-agent-evals.sh`, `agent/`); not shipped by `install.sh`
+- `openspec/` - package specs (`specs/`) and the history of changes to this package (`changes/`)
+- `docs/archive/` - frozen history of how the package was first built; nothing live reads it
+- `evals/` - the self-contained maintainer eval suite (`run-evals.sh`, `evals.md`) plus the optional Kiro, Claude Code, and Codex agent-eval runner (`run-agent-evals.sh`, `agent/`); not shipped by `install.sh`
 
 Skills run against the target repo `fast-track-ai/` tree using scripts and templates bundled in this package. No machine-fixed paths. Only `fast-track-ai-init` installs anything, through its own script path.
 
@@ -22,7 +24,7 @@ Skills run against the target repo `fast-track-ai/` tree using scripts and templ
 - No stubs: a published script must actually run in the test below.
 - A live target project is never edited from here. Method changes validate in `/tmp`.
 - Each script and template has one owner skill. Cross-skill consumers reference the owner copy via package-relative sibling paths. No `shared` link.
-- This repository does not run the method on itself: never run `fast-track-ai-init` here, and treat the `fast-track-ai/` tree as a read-only archive.
+- This repository does not run the method on itself: never run `fast-track-ai-init` here.
 
 ## Install
 

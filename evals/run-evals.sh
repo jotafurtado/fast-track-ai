@@ -206,17 +206,422 @@ init_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-init.sh"
 index_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-index.sh"
 gate="$repo_root/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
 
+# fake_agent is an executable stand-in for a harness CLI. It answers the
+# prerequisite probes, then emits canned native events (FAKE_EVENTS file, or a
+# minimal successful session for FAKE_KIND). It never contacts a model.
+write_fake_agent() {
+  fake_agent="$work/fake-agent"
+  if [ -x "$fake_agent" ]; then return 0; fi
+  cat >"$fake_agent" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+  --version) echo "fake-agent 0.0.0"; exit 0;;
+  whoami|login) exit 0;;
+  auth) echo '{"loggedIn":true}'; exit 0;;
+esac
+case "$PWD" in
+  */compat/workspace) printf 'ftai-compat-7f3a9c2e\n' >token.txt;;
+  */resume/workspace) : >.eval-validate-alpha-ran;;
+esac
+if [ -n "${FAKE_EVENTS:-}" ]; then cat "$FAKE_EVENTS"; exit 0; fi
+case "${FAKE_KIND:-}" in
+  claude) printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-session","model":"fake","permissionMode":"dontAsk","claude_code_version":"0.0.0"}' '{"type":"result","subtype":"success","is_error":false,"session_id":"fake-session","usage":{"input_tokens":1,"output_tokens":1}}';;
+  codex) printf '%s\n' '{"type":"thread.started","thread_id":"fake-thread"}' '{"type":"turn.started"}' '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}';;
+  kiro) printf '%s\n' '{"type":"runStarted","data":{}}' '{"type":"metadata","data":{"sessionId":"fake-session"}}' '{"type":"runFinished","data":{"sessionId":"fake-session","status":"success","stopReason":"end_turn"}}';;
+esac
+EOF
+  chmod +x "$fake_agent"
+}
+
+# Unknown harnesses and missing executables must be reported before any CLI starts.
+check_agent_runner_prerequisites() {
+  tripwire="$work/tripwire"
+  printf '#!/usr/bin/env bash\n: >"%s.called"\nexit 0\n' "$tripwire" >"$tripwire"
+  chmod +x "$tripwire"
+  rm -f "$tripwire.called"
+  runner="$repo_root/evals/run-agent-evals.sh"
+  for harness_name in kiro claude codex; do
+    case "$harness_name" in
+      kiro) cli_env=KIRO_CLI; cli_label="Kiro CLI";;
+      claude) cli_env=CLAUDE_CLI; cli_label="Claude Code CLI";;
+      codex) cli_env=CODEX_CLI; cli_label="Codex CLI";;
+    esac
+    out_file="$work/agent-prereq-$harness_name.out"
+    env KIRO_CLI="$tripwire" CLAUDE_CLI="$tripwire" CODEX_CLI="$tripwire" "$cli_env=$work/missing-$harness_name-cli" \
+      bash "$runner" all --harness "$harness_name" >"$out_file" 2>&1 || fail "agent-eval runner without a $cli_label did not exit 0"
+    assert_contains "$out_file" "HARNESS: $harness_name"
+    assert_contains "$out_file" "RESULT: compat prerequisite-unavailable: $cli_label not found"
+    assert_contains "$out_file" "prerequisite-unavailable=6"
+    [ "$(grep -c '^RESULT: .* prerequisite-unavailable: ' "$out_file")" -eq 6 ] || fail "$harness_name: not all six selectors reported prerequisite-unavailable"
+    [ ! -e "$tripwire.called" ] || fail "$harness_name: a CLI was invoked despite a missing prerequisite"
+  done
+  # Default harness is Kiro.
+  env KIRO_CLI="$work/missing-default-cli" CLAUDE_CLI="$tripwire" CODEX_CLI="$tripwire" bash "$runner" all >"$work/agent-prereq-default.out" 2>&1 || fail "default agent-eval invocation did not exit 0"
+  assert_contains "$work/agent-prereq-default.out" "HARNESS: kiro"
+  assert_contains "$work/agent-prereq-default.out" "RESULT: compat prerequisite-unavailable: Kiro CLI not found"
+  # Unknown harness and unsupported settings fail with a usage error before any CLI.
+  rc=0
+  env KIRO_CLI="$tripwire" CLAUDE_CLI="$tripwire" CODEX_CLI="$tripwire" bash "$runner" all --harness bogus >"$work/agent-unknown.out" 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || fail "unknown harness exited $rc, expected 2"
+  assert_contains "$work/agent-unknown.out" "unknown harness: bogus"
+  rc=0
+  env KIRO_CLI="$tripwire" CLAUDE_CLI="$tripwire" CODEX_CLI="$tripwire" bash "$runner" all --harness claude --effort bogus >"$work/agent-effort.out" 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || fail "unsupported effort exited $rc, expected 2"
+  assert_contains "$work/agent-effort.out" "not supported by claude"
+  [ ! -e "$tripwire.called" ] || fail "a CLI was invoked for a usage error"
+}
+
+# With a stand-in CLI per harness, every scenario is staged under the selected
+# harness's native directory with the canonical prompts plus only the location hint.
+check_agent_runner_staging() {
+  write_fake_agent
+  codex_home_dir="$work/codex-home"
+  mkdir -p "$codex_home_dir"
+  source_before="$(cd "$repo_root/skills" && find . -type f -exec shasum -a 256 {} + | LC_ALL=C sort -k2 | shasum -a 256)"
+  for harness_name in kiro claude codex; do
+    case "$harness_name" in
+      kiro) cli_env=KIRO_CLI; native=.kiro;;
+      claude) cli_env=CLAUDE_CLI; native=.claude;;
+      codex) cli_env=CODEX_CLI; native=.agents;;
+    esac
+    keep="$work/staging-$harness_name"
+    out_file="$work/staging-$harness_name.out"
+    env "$cli_env=$fake_agent" FAKE_KIND="$harness_name" CODEX_HOME="$codex_home_dir" \
+      bash "$repo_root/evals/run-agent-evals.sh" all --harness "$harness_name" --timeout 60 --keep-dir "$keep" >"$out_file" 2>&1 || true
+    assert_contains "$out_file" "HARNESS: $harness_name"
+    assert_contains "$out_file" "RESULT: compat pass"
+    jq -e --arg h "$harness_name" '.harness == $h' "$keep/$harness_name/compat/result.json" >/dev/null || fail "$harness_name compat result.json does not identify the harness"
+    for fixture_dir in "$repo_root"/evals/agent/fixtures/*/; do
+      scenario="$(basename "$fixture_dir")"
+      for turn_file in "$fixture_dir"turns/turn-*.txt; do
+        original="$(cat "$turn_file")"
+        case "$original" in
+          *.kiro*|*.claude/*|*.agents/*) fail "fixture prompt names a harness location: $turn_file";;
+        esac
+        staged_file="$keep/$harness_name/$scenario/turns/$(basename "$turn_file")"
+        [ -f "$staged_file" ] || fail "$harness_name did not stage $scenario/$(basename "$turn_file")"
+        expected="${original/ in this repository./ in this repository. The skill is available under $native/skills/.}"
+        [ "$(cat "$staged_file")" = "$expected" ] || fail "$harness_name staged prompt differs from the fixture beyond the location hint: $staged_file"
+      done
+      if [ "$scenario" != "compat" ]; then
+        skill_copy="$keep/$harness_name/$scenario/workspace/$native/skills/fast-track-ai-spec/SKILL.md"
+        [ -f "$skill_copy" ] || fail "$harness_name did not stage the package under $native/skills for $scenario"
+        cmp -s "$skill_copy" "$repo_root/skills/fast-track-ai-spec/SKILL.md" || fail "$harness_name staged skill differs from the package"
+        [ ! -L "$keep/$harness_name/$scenario/workspace/$native/skills/fast-track-ai-spec" ] || fail "$harness_name staged skill is a symlink into the package"
+        for other in .kiro .claude .agents; do
+          [ "$other" = "$native" ] || [ ! -e "$keep/$harness_name/$scenario/workspace/$other" ] || fail "$harness_name workspace has an unrelated $other directory"
+        done
+      fi
+    done
+    manifest="$keep/$harness_name/resume/evidence/checkpoints/turn-01.manifest"
+    assert_contains "$manifest" "  .eval-validate-alpha-ran"
+    assert_contains "$manifest" "  scripts/validate-alpha.sh"
+    if grep -Eq "  \.(kiro|claude|agents)/" "$manifest"; then fail "$harness_name checkpoint includes harness configuration"; fi
+  done
+  source_after="$(cd "$repo_root/skills" && find . -type f -exec shasum -a 256 {} + | LC_ALL=C sort -k2 | shasum -a 256)"
+  [ "$source_before" = "$source_after" ] || fail "scenario staging modified the source package"
+}
+
+cl_init() { printf '%s\n' '{"type":"system","subtype":"init","session_id":"cl-session","model":"fake","permissionMode":"dontAsk","claude_code_version":"0.0.0"}'; }
+cl_block() { jq -n -c --arg id "$1" --arg name "$2" --argjson input "$3" '{type:"tool_use",id:$id,name:$name,input:$input}'; }
+cl_msg() { jq -s -c '{type:"assistant",message:{content:.}}'; }
+cl_use() { cl_block "$@" | cl_msg; }
+cl_res() { jq -n -c --arg id "$1" --argjson err "${2:-false}" '{type:"user",message:{content:[{type:"tool_result",tool_use_id:$id,is_error:$err,content:"x"}]}}'; }
+cl_done() { printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"session_id":"cl-session","usage":{"input_tokens":1,"output_tokens":1}}'; }
+cl_write() { jq -n -c --arg p "$1" --arg c "$2" '{file_path:$p,content:$c}'; }
+cl_path() { jq -n -c --arg p "$1" '{file_path:$p}'; }
+cl_cmd() { jq -n -c --arg c "$1" '{command:$c}'; }
+
+cx_start() { printf '%s\n' "{\"type\":\"thread.started\",\"thread_id\":\"$1\"}" '{"type":"turn.started"}'; }
+cx_done() { printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'; }
+cx_fc() {
+  local phase="$1" id="$2"
+  shift 2
+  printf '%s\n' "$@" | jq -R -s -c --arg phase "$phase" --arg id "$id" \
+    '{type:("item." + $phase), item:{id:$id, type:"file_change", changes:(split("\n") | map(select(length > 0)) | map({path:., kind:"update"})), status:(if $phase == "completed" then "completed" else "in_progress" end)}}'
+}
+cx_rollout_item() {
+  jq -n -c --arg p "$1" --arg t "$2" --arg v "$3" \
+    '{type:"event_msg", payload:{type:"item_completed", item:{type:"FileChange", status:"completed", changes:{($p):(if $t == "add" then {type:"add", content:$v} else {type:"update", unified_diff:$v, move_path:null} end)}}}}'
+}
+cx_rollout_batch() {
+  jq -s -c '{type:"event_msg", payload:{type:"item_completed", item:{type:"FileChange", status:"completed", changes:(map(.payload.item.changes) | add)}}}'
+}
+cx_place_rollout() {
+  mkdir -p "$codex_home_dir/sessions/2026/10/13"
+  cat >"$codex_home_dir/sessions/2026/10/13/rollout-2026-10-13T00-00-00-$1.jsonl"
+}
+
+# run_fake_adapter <kiro|claude|codex> <events-file> <out-dir>
+run_fake_adapter() {
+  native_ws="$work/native-ws"
+  rm -rf "$native_ws" "$3" "$work/native-turns"
+  mkdir -p "$native_ws" "$work/native-turns"
+  printf 'prompt\n' >"$work/native-turns/turn-01.txt"
+  case "$1" in kiro) cli_env=KIRO_CLI;; claude) cli_env=CLAUDE_CLI;; codex) cli_env=CODEX_CLI;; esac
+  env "$cli_env=$fake_agent" FAKE_EVENTS="$2" CODEX_HOME="$codex_home_dir" \
+    bash "$repo_root/evals/agent/$1-adapter.sh" --workspace "$native_ws" --turns-dir "$work/native-turns" --out "$3" --timeout 60 >"$work/native-adapter.out" 2>&1 \
+    || fail "$1 adapter failed on a native-event fixture"
+}
+
+assert_equal() { [ "$1" = "$2" ] || fail "$3: expected '$2', got '$1'"; }
+assert_unproven() {
+  case "$1" in
+    unproven:*) ;;
+    *) fail "$2: expected unproven, got '$1'";;
+  esac
+}
+assert_reason() {
+  case "$(ftai_turn_incomplete_reasons "$1/turns.jsonl" 1)" in
+    *"$2"*) ;;
+    *) fail "$3: coverage reasons lack '$2': $(ftai_turn_incomplete_reasons "$1/turns.jsonl" 1)";;
+  esac
+}
+
+# Native-event regression fixtures: consumer-visible verdict evidence must never
+# pass absence or ordering from incomplete, failed, batched, or shell-only actions.
+check_native_event_evidence() {
+  write_fake_agent
+  codex_home_dir="$work/codex-home"
+  mkdir -p "$codex_home_dir"
+  mkdir -p "$work/native-ws"
+  n_ws="$(cd "$work/native-ws" && pwd)"
+  spec_rel="fast-track-ai/tracks/001-x/spec.md"
+  tasks_rel="fast-track-ai/tracks/001-x/tasks.md"
+  approved=$'---\nstatus: approved\n---\n'
+
+  # Claude: separate completed approval writes before the product edit are provable.
+  { cl_init
+    cl_use r0 Read "$(cl_path "$n_ws/.claude/skills/fast-track-ai-spec/SKILL.md")"; cl_res r0
+    cl_use a1 Write "$(cl_write "$n_ws/$spec_rel" "$approved")"; cl_res a1
+    cl_use a2 Write "$(cl_write "$n_ws/$tasks_rel" "$approved")"; cl_res a2
+    cl_use p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; cl_res p1
+    printf '%s\n' "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Base directory for this skill: $n_ws/.claude/skills/fast-track-ai-spec\\n\\nbody\"}]}}"
+    cl_done; } >"$work/claude-separate.jsonl"
+  out="$work/claude-separate-out"
+  run_fake_adapter claude "$work/claude-separate.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" true "claude separate: coverage"
+  assert_equal "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" ok "claude separate: approval order"
+  jq -e '.sessionId == "cl-session" and ([.skillLoads[] | select(.skill == "fast-track-ai-spec" and .staged == true)] | length > 0)' "$out/turns.jsonl" >/dev/null || fail "claude separate: session identity or staged skill load not recorded"
+
+  # Claude: a skill read from a global copy never counts as the staged package.
+  { cl_init
+    cl_use r0 Read "$(cl_path "/Users/someone/.claude/skills/fast-track-ai-spec/SKILL.md")"; cl_res r0
+    cl_done; } >"$work/claude-global.jsonl"
+  out="$work/claude-global-out"
+  run_fake_adapter claude "$work/claude-global.jsonl" "$out"
+  jq -e '([.skillLoads[] | select(.staged == true)] | length == 0) and ([.skillLoads[] | select(.staged == false)] | length > 0)' "$out/turns.jsonl" >/dev/null || fail "claude global: a global skill copy was treated as staged"
+
+  # Claude: approval writes batched with the product edit prove no order.
+  { cl_init
+    { cl_block a1 Write "$(cl_write "$n_ws/$spec_rel" "$approved")"
+      cl_block a2 Write "$(cl_write "$n_ws/$tasks_rel" "$approved")"
+      cl_block p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; } | cl_msg
+    cl_res a1; cl_res a2; cl_res p1; cl_done; } >"$work/claude-batched.jsonl"
+  out="$work/claude-batched-out"
+  run_fake_adapter claude "$work/claude-batched.jsonl" "$out"
+  assert_unproven "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" "claude batched"
+
+  # Claude: a failed approval write is not an approval.
+  { cl_init
+    cl_use a1 Write "$(cl_write "$n_ws/$spec_rel" "$approved")"; cl_res a1 true
+    cl_use a2 Write "$(cl_write "$n_ws/$tasks_rel" "$approved")"; cl_res a2
+    cl_use p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; cl_res p1
+    cl_done; } >"$work/claude-failed.jsonl"
+  out="$work/claude-failed-out"
+  run_fake_adapter claude "$work/claude-failed.jsonl" "$out"
+  assert_unproven "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" "claude failed approval"
+
+  # Claude: a durable ordering violation still fails.
+  { cl_init
+    cl_use p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; cl_res p1
+    cl_use a1 Write "$(cl_write "$n_ws/$spec_rel" "$approved")"; cl_res a1
+    cl_use a2 Write "$(cl_write "$n_ws/$tasks_rel" "$approved")"; cl_res a2
+    cl_done; } >"$work/claude-violation.jsonl"
+  out="$work/claude-violation-out"
+  run_fake_adapter claude "$work/claude-violation.jsonl" "$out"
+  assert_equal "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" violation "claude violation"
+
+  # Claude: a truncated stream with an unanswered call cannot prove absence.
+  { cl_init
+    cl_use p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; } >"$work/claude-truncated.jsonl"
+  out="$work/claude-truncated-out"
+  run_fake_adapter claude "$work/claude-truncated.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" false "claude truncated: coverage"
+  assert_reason "$out" stream-incomplete "claude truncated"
+  assert_reason "$out" unresolved-actions "claude truncated"
+
+  # Claude: a subagent call without observable inner actions leaves a coverage gap.
+  { cl_init
+    cl_use g1 Task '{"prompt":"edit things"}'; cl_res g1
+    cl_done; } >"$work/claude-subagent.jsonl"
+  out="$work/claude-subagent-out"
+  run_fake_adapter claude "$work/claude-subagent.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" false "claude subagent: coverage"
+  assert_reason "$out" unobserved-subagent "claude subagent"
+
+  # Shell commands that may mutate a path are not edit evidence.
+  { cl_init
+    cl_use s1 Bash "$(cl_cmd 'printf x > farewell.txt')"; cl_res s1
+    cl_done; } >"$work/claude-shell.jsonl"
+  out="$work/claude-shell-out"
+  run_fake_adapter claude "$work/claude-shell.jsonl" "$out"
+  assert_equal "$(ftai_shell_may_mutate "$out/turn-01.actions.jsonl" farewell.txt)" yes "shell mutation gap"
+  { cl_init
+    cl_use s1 Bash "$(cl_cmd 'cat farewell.txt')"; cl_res s1
+    cl_done; } >"$work/claude-readonly.jsonl"
+  out="$work/claude-readonly-out"
+  run_fake_adapter claude "$work/claude-readonly.jsonl" "$out"
+  assert_equal "$(ftai_shell_may_mutate "$out/turn-01.actions.jsonl" farewell.txt)" no "read-only shell command"
+
+  # Shell heredocs: plain data bodies are not shell code, but redirects, interpreter
+  # bodies, and expanding bodies still count as possible mutations.
+  shell_case() {
+    jq -n -c --arg c "$3" '{turn:1,seq:1,endSeq:2,kind:"execute",tool:"Bash",paths:[],command:$c,status:"completed"}' >"$work/shell-case.actions.jsonl"
+    assert_equal "$(ftai_shell_may_mutate "$work/shell-case.actions.jsonl" farewell.txt)" "$1" "shell heredoc: $2"
+  }
+  shell_case no "quoted data body written to another file" $'cat > assets/note.md <<\'EOF\'\nThe farewell.txt file stays absent; do not rm farewell.txt.\nEOF'
+  shell_case yes "heredoc redirected to the path" $'cat > farewell.txt <<\'EOF\'\ncontent\nEOF'
+  shell_case yes "interpreter heredoc body" $'bash <<\'EOF\'\nprintf x > farewell.txt\nEOF'
+  shell_case yes "unquoted body with command substitution" $'cat > assets/note.md <<EOF\n$(touch farewell.txt)\nEOF'
+  shell_case yes "mutation after a data heredoc" $'cat > assets/note.md <<\'EOF\'\ndata\nEOF\nrm farewell.txt'
+
+  # Codex: one patch editing approvals and product is a batch; without local
+  # patch content the approval is not observable at all.
+  { cx_start cx-nodetail
+    cx_fc started item_1 "$n_ws/$spec_rel" "$n_ws/$tasks_rel" "$n_ws/greeting.txt"
+    cx_fc completed item_1 "$n_ws/$spec_rel" "$n_ws/$tasks_rel" "$n_ws/greeting.txt"
+    cx_done; } >"$work/codex-batch.jsonl"
+  out="$work/codex-nodetail-out"
+  run_fake_adapter codex "$work/codex-batch.jsonl" "$out"
+  jq -e '.sessionId == "cx-nodetail" and .localEvidence == "unavailable"' "$out/turns.jsonl" >/dev/null || fail "codex without rollout: session or local evidence state not recorded"
+  assert_unproven "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" "codex without patch content"
+
+  # Codex: with local patch content the batch is preserved and still proves no order.
+  diff_text=$'@@ -1,3 +1,3 @@\n---\n-status: draft\n+status: approved\n'
+  { cx_rollout_item "$n_ws/$spec_rel" update "$diff_text"
+    cx_rollout_item "$n_ws/$tasks_rel" update "$diff_text"
+    cx_rollout_item "$n_ws/greeting.txt" add $'hello\n'; } | cx_rollout_batch | cx_place_rollout cx-nodetail
+  { cx_start cx-nodetail
+    cx_fc started item_1 "$n_ws/$spec_rel" "$n_ws/$tasks_rel" "$n_ws/greeting.txt"
+    cx_fc completed item_1 "$n_ws/$spec_rel" "$n_ws/$tasks_rel" "$n_ws/greeting.txt"
+    cx_done; } >"$work/codex-batch.jsonl"
+  out="$work/codex-batch-out"
+  run_fake_adapter codex "$work/codex-batch.jsonl" "$out"
+  jq -e '.localEvidence == "rollout"' "$out/turns.jsonl" >/dev/null || fail "codex batch: rollout evidence not found"
+  [ "$(jq -s -r 'length' "$out/turn-01.actions.jsonl")" -eq 1 ] || fail "codex batch: the patch was split into several actions"
+  jq -s -e '.[0].written | length > 0' "$out/turn-01.actions.jsonl" >/dev/null || fail "codex batch: patch content was not preserved"
+  case "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" in
+    unproven:*batched*) ;;
+    *) fail "codex batch: expected an unproven batched order, got '$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")'";;
+  esac
+
+  # Codex: separate completed patches with local content prove approval order.
+  { cx_rollout_item "$n_ws/$spec_rel" update "$diff_text" | cx_rollout_batch
+    cx_rollout_item "$n_ws/$tasks_rel" update "$diff_text" | cx_rollout_batch
+    cx_rollout_item "$n_ws/greeting.txt" add $'hello\n' | cx_rollout_batch; } | cx_place_rollout cx-separate
+  { cx_start cx-separate
+    cx_fc started item_1 "$n_ws/$spec_rel"; cx_fc completed item_1 "$n_ws/$spec_rel"
+    cx_fc started item_2 "$n_ws/$tasks_rel"; cx_fc completed item_2 "$n_ws/$tasks_rel"
+    cx_fc started item_3 "$n_ws/greeting.txt"; cx_fc completed item_3 "$n_ws/greeting.txt"
+    cx_done; } >"$work/codex-separate.jsonl"
+  out="$work/codex-separate-out"
+  run_fake_adapter codex "$work/codex-separate.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" true "codex separate: coverage"
+  assert_equal "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" ok "codex separate: approval order"
+
+  # Kiro: a stream that never finishes cannot prove absence; a finished one can.
+  kiro_call="$(jq -n -c --arg p "$n_ws/greeting.txt" '{type:"sessionUpdate", data:{update:{sessionUpdate:"tool_call", toolCallId:"k1", kind:"edit", locations:[{path:$p}], rawInput:{path:$p, content:"hi"}}}}')"
+  printf '%s\n' '{"type":"runStarted","data":{}}' "$kiro_call" >"$work/kiro-truncated.jsonl"
+  out="$work/kiro-truncated-out"
+  run_fake_adapter kiro "$work/kiro-truncated.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" false "kiro truncated: coverage"
+  assert_reason "$out" stream-incomplete "kiro truncated"
+  kiro_update="$(jq -n -c '{type:"sessionUpdate", data:{update:{sessionUpdate:"tool_call_update", toolCallId:"k1", status:"completed"}}}')"
+  printf '%s\n' '{"type":"runStarted","data":{}}' '{"type":"metadata","data":{"sessionId":"kiro-session"}}' "$kiro_call" "$kiro_update" '{"type":"runFinished","data":{"sessionId":"kiro-session","status":"success","stopReason":"end_turn"}}' >"$work/kiro-complete.jsonl"
+  out="$work/kiro-complete-out"
+  run_fake_adapter kiro "$work/kiro-complete.jsonl" "$out"
+  assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" true "kiro complete: coverage"
+
+  # Native disclosure provenance is structured data, not response prose or a name.
+  kiro_disclosure_case() {
+    local source_path="$1" completion="$2" include_source="$3" destination="$4"
+    jq -n -c '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call",toolCallId:"ks1",rawInput:{name:"fast-track-ai-spec"},_meta:{kiro:{toolId:"disclose_context"}}}}}' >"$destination"
+    jq -n -c --arg p "$source_path" --arg s "$completion" --argjson source "$include_source" \
+      '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call_update",toolCallId:"ks1",status:$s,
+        content:[{type:"content",content:{type:"text",text:("Skill directory: " + $p)}}],
+        rawOutput:(if $source then {item:{type:"skill",id:$p,scope:(if ($p | startswith("/Users/")) then "user" else "workspace" end)}} else null end),
+        _meta:{kiro:{toolId:"disclose_context"}}}}}' >>"$destination"
+    printf '%s\n' '{"type":"runFinished","data":{"sessionId":"kiro-session","status":"success","stopReason":"end_turn"}}' >>"$destination"
+  }
+  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" completed true "$work/kiro-disclosed.jsonl"
+  out="$work/kiro-disclosed-out"
+  run_fake_adapter kiro "$work/kiro-disclosed.jsonl" "$out"
+  jq -e 'any(.skillLoads[]; .skill == "fast-track-ai-spec" and .staged == true and .via == "disclosure")' "$out/turns.jsonl" >/dev/null \
+    || fail "kiro native disclosure did not record its workspace source"
+
+  kiro_disclosure_case "/Users/someone/.kiro/skills/fast-track-ai-spec/SKILL.md" completed true "$work/kiro-disclosed-global.jsonl"
+  out="$work/kiro-disclosed-global-out"
+  run_fake_adapter kiro "$work/kiro-disclosed-global.jsonl" "$out"
+  jq -e '([.skillLoads[] | select(.staged == true)] | length == 0) and any(.skillLoads[]; .staged == false)' "$out/turns.jsonl" >/dev/null \
+    || fail "kiro global disclosure was treated as the staged package"
+
+  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" failed true "$work/kiro-disclosed-failed.jsonl"
+  out="$work/kiro-disclosed-failed-out"
+  run_fake_adapter kiro "$work/kiro-disclosed-failed.jsonl" "$out"
+  jq -e '([.skillLoads[] | select(.staged == true)] | length == 0)' "$out/turns.jsonl" >/dev/null \
+    || fail "kiro failed disclosure counted as a skill load"
+
+  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" completed false "$work/kiro-disclosed-prose.jsonl"
+  out="$work/kiro-disclosed-prose-out"
+  run_fake_adapter kiro "$work/kiro-disclosed-prose.jsonl" "$out"
+  jq -e '([.skillLoads[] | select(.staged == true)] | length == 0)' "$out/turns.jsonl" >/dev/null \
+    || fail "kiro disclosure prose without structured provenance counted as a load"
+
+  # A native write carries the new bytes in text, distinct from any old content.
+  { printf '%s\n' '{"type":"runStarted","data":{}}'
+    jq -n -c --arg p "$n_ws/$spec_rel" --arg t "$approved" \
+      '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call",toolCallId:"kt1",kind:"edit",rawInput:{path:$p,text:$t}}}}'
+    jq -n -c '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call_update",toolCallId:"kt1",status:"completed"}}}'
+    printf '%s\n' '{"type":"runFinished","data":{"sessionId":"kiro-session","status":"success","stopReason":"end_turn"}}'; } >"$work/kiro-write-text.jsonl"
+  out="$work/kiro-write-text-out"
+  run_fake_adapter kiro "$work/kiro-write-text.jsonl" "$out"
+  jq -s -e --arg t "$approved" 'any(.[]; .kind == "edit" and .written == [$t])' "$out/turn-01.actions.jsonl" >/dev/null \
+    || fail "kiro native text write did not preserve the actual new bytes"
+
+  # The validation fixture emits an execution record; printing its source does not.
+  validation_source="$(cat "$repo_root/evals/agent/fixtures/resume/workspace/scripts/validate-alpha.sh")"
+  validation_marker="FTAI_VALIDATION_EXECUTED:resume:alpha"
+  validation_case() {
+    local expected="$1" description="$2" command="$3" native_output="$4"
+    jq -n -c --arg c "$command" --argjson o "$native_output" \
+      '{turn:1,seq:1,endSeq:2,kind:"execute",command:$c,output:$o,status:"completed"}' >"$work/validation-case.actions.jsonl"
+    assert_equal "$(ftai_validation_execution "$work/validation-case.actions.jsonl" scripts/validate-alpha.sh "$validation_marker" "$validation_source")" "$expected" "$description"
+  }
+  source_output="$(jq -n -c --arg s "$validation_source" '[$s]')"
+  emitted_output="$(jq -n -c --arg s "$validation_marker" '[$s]')"
+  validation_case not-observed "reading Validate source is not execution" 'cat scripts/validate-alpha.sh' "$source_output"
+  validation_case executed "actual Validate output records execution" 'sh scripts/validate-alpha.sh' "$emitted_output"
+  validation_case executed "deleting the file marker does not erase native execution" 'sh scripts/validate-alpha.sh; rm .eval-validate-alpha-ran' "$emitted_output"
+  validation_case unproven "missing Validate command output is not absence" 'sh scripts/validate-alpha.sh' null
+  validation_case unproven "suppressed Validate output is inconclusive" 'sh scripts/validate-alpha.sh >/dev/null; rm .eval-validate-alpha-ran' '[]'
+  validation_case unproven "opaque source filtering is not a verified read" 'cat scripts/validate-alpha.sh | another-command' "$source_output"
+}
+
 run_self() {
   bash -n "$repo_root/install.sh"
   bash -n "$init_script"
   bash -n "$index_script"
   bash -n "$gate"
-  bash -n "$repo_root/evals/run-agent-evals.sh"
-  bash -n "$repo_root/evals/agent/kiro-adapter.sh"
+  for script in "$repo_root/evals/run-agent-evals.sh" "$repo_root"/evals/agent/*.sh; do
+    bash -n "$script"
+  done
   assert_not_matches "$repo_root/AGENTS.md" 'fast-track-ai-gate\.sh.*\|\|[[:space:]]*true'
-  KIRO_CLI="$work/missing-kiro-cli" bash "$repo_root/evals/run-agent-evals.sh" all >"$work/agent-prereq.out" 2>&1 || fail "agent-eval runner without a Kiro CLI did not exit 0"
-  assert_contains "$work/agent-prereq.out" "RESULT: compat prerequisite-unavailable: Kiro CLI not found"
-  assert_contains "$work/agent-prereq.out" "prerequisite-unavailable=6"
+  # shellcheck source=agent/lib.sh
+  . "$repo_root/evals/agent/lib.sh"
+  check_agent_runner_prerequisites
+  check_agent_runner_staging
+  check_native_event_evidence
   pass "runner self-check"
 }
 
@@ -729,16 +1134,123 @@ assert_installed_layout() {
   [ "$cmd_count" -eq 7 ] || fail "expected 7 installed commands, got $cmd_count"
 }
 
+# tree_fingerprint <dir>: sha256 over every file path and content.
+tree_fingerprint() {
+  (cd "$1" && find . -type f -exec shasum -a 256 {} + | LC_ALL=C sort -k2 | shasum -a 256)
+}
+
+# check_installed_resources <agents-skills-dir> <claude-skills-dir>
+# Reads every skill's metadata and owner templates and resolves sibling
+# resources from the installed directories. Prints the first broken location
+# and returns 1.
+check_installed_resources() {
+  local dir skill name rel count
+  for dir in "$1" "$2"; do
+    count=0
+    for skill in "$dir"/fast-track-ai-*; do
+      [ -d "$skill" ] || continue
+      name="$(basename "$skill")"
+      [ -r "$skill/SKILL.md" ] || { echo "installed skill metadata is unreadable: $skill/SKILL.md"; return 1; }
+      [ "$(frontmatter_field "$skill/SKILL.md" name)" = "$name" ] || { echo "installed skill metadata name does not match $name: $skill/SKILL.md"; return 1; }
+      [ -n "$(frontmatter_field "$skill/SKILL.md" description)" ] || { echo "installed skill metadata has no description: $skill/SKILL.md"; return 1; }
+      for rel in "$skill"/assets/*; do
+        [ -e "$rel" ] || continue
+        [ -s "$rel" ] || { echo "installed template is empty or unreadable: $rel"; return 1; }
+      done
+      for rel in $(grep -oE '(^|[^.A-Za-z])\./(scripts|assets)/[A-Za-z0-9_-]+\.(sh|md)' "$skill/SKILL.md" | grep -oE '\./(scripts|assets)/[A-Za-z0-9_-]+\.(sh|md)' | sort -u); do
+        [ -f "$skill/$rel" ] || { echo "installed owner resource does not resolve: $skill/$rel"; return 1; }
+        case "$rel" in *.sh) [ -x "$skill/$rel" ] || { echo "installed owner script is not executable: $skill/$rel"; return 1; };; esac
+      done
+      for rel in $(grep -oE '\.\./fast-track-ai-[a-z]+/(scripts|assets)/[A-Za-z0-9_-]+\.(sh|md)' "$skill/SKILL.md" | sort -u); do
+        [ -f "$skill/$rel" ] || { echo "installed sibling resource does not resolve: $skill/$rel"; return 1; }
+        case "$rel" in *.sh) [ -x "$skill/$rel" ] || { echo "installed sibling script is not executable: $skill/$rel"; return 1; };; esac
+      done
+      count=$((count + 1))
+    done
+    [ "$count" -eq 7 ] || { echo "expected 7 installed skills in $dir, got $count"; return 1; }
+  done
+}
+
+# run_installed_scripts <label> <skills-dir>: init twice, index, and gate through
+# the installed owner scripts against a disposable target.
+run_installed_scripts() {
+  local t="$work/installed-run-$1" base="$2" track first
+  local i_init="$2/fast-track-ai-init/scripts/fast-track-ai-init.sh"
+  local i_index="$2/fast-track-ai-init/scripts/fast-track-ai-index.sh"
+  local i_gate="$2/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+  rm -rf "$t"
+  mkdir -p "$t"
+  "$i_init" "$t" >/dev/null || fail "installed init failed through $base"
+  first="$(tree_fingerprint "$t")"
+  "$i_init" "$t" >/dev/null || fail "installed init rerun failed through $base"
+  [ "$first" = "$(tree_fingerprint "$t")" ] || fail "installed init rerun changed the target through $base"
+  for track in research refs handoffs/archive assessments decisions tracks; do
+    assert_dir "$t/fast-track-ai/$track"
+  done
+  assert_file "$t/fast-track-ai/INDEX.md"
+  assert_file "$t/AGENTS.md"
+
+  write_intent "$t" 001-valid draft
+  write_spec "$t/fast-track-ai/tracks/001-valid/spec.md" approved
+  write_tasks "$t/fast-track-ai/tracks/001-valid/tasks.md" approved x
+  write_intent "$t" 002-open draft
+  write_spec "$t/fast-track-ai/tracks/002-open/spec.md" approved
+  write_tasks "$t/fast-track-ai/tracks/002-open/tasks.md" approved " "
+  write_intent "$t" 003-unapproved draft
+  write_spec "$t/fast-track-ai/tracks/003-unapproved/spec.md" draft
+  write_tasks "$t/fast-track-ai/tracks/003-unapproved/tasks.md" approved x
+
+  "$i_index" "$t" >/dev/null || fail "installed index failed through $base"
+  for track in 001-valid 002-open 003-unapproved; do
+    assert_contains "$t/fast-track-ai/INDEX.md" "| $track | draft |"
+  done
+  cp "$t/fast-track-ai/INDEX.md" "$t/index.first"
+  "$i_index" "$t" >/dev/null || fail "installed index rerun failed through $base"
+  cmp -s "$t/index.first" "$t/fast-track-ai/INDEX.md" || fail "installed index rerun changed INDEX.md through $base"
+
+  [ "$("$i_gate" --track 001-valid --root "$t")" = "PASS: 001-valid cycle intact" ] || fail "installed gate did not accept the valid closed track through $base"
+  expect_failure "installed gate with an open task through $base" "$i_gate" --track 002-open --root "$t"
+  assert_contains "$work/failure.out" "open task"
+  expect_failure "installed gate with an unapproved spec through $base" "$i_gate" --track 003-unapproved --root "$t"
+  assert_contains "$work/failure.out" "spec.md status must be approved"
+}
+
+# verify_installed_layout <label> <agents-skills-dir> <claude-skills-dir>
+verify_installed_layout() {
+  local msg
+  msg="$(check_installed_resources "$2" "$3")" || fail "$msg"
+  run_installed_scripts "$1-agents" "$2"
+  run_installed_scripts "$1-claude" "$3"
+}
+
 run_install() {
   custom="$work/install-custom"
   mkdir -p "$custom/claude"
   "$repo_root/install.sh" --agents-dir "$custom/agents/skills" --claude-dir "$custom/claude/skills" >/dev/null
   assert_installed_layout "$custom/agents/skills" "$custom/claude/skills" "$custom/claude/commands"
+  verify_installed_layout custom "$custom/agents/skills" "$custom/claude/skills"
 
   default="$work/install-default"
   mkdir -p "$default/home/.claude"
   HOME="$default/home" "$repo_root/install.sh" >/dev/null
   assert_installed_layout "$default/home/.agents/skills" "$default/home/.claude/skills" "$default/home/.claude/commands"
+  verify_installed_layout default "$default/home/.agents/skills" "$default/home/.claude/skills"
+
+  # A broken sibling in a disposable copy of the package fails at the affected location.
+  broken="$work/install-broken"
+  mkdir -p "$broken/pkg" "$broken/claude"
+  for item in skills commands install.sh; do
+    cp -R "$repo_root/$item" "$broken/pkg/$item"
+  done
+  rm "$broken/pkg/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+  "$broken/pkg/install.sh" --agents-dir "$broken/agents/skills" --claude-dir "$broken/claude/skills" >/dev/null
+  if broken_message="$(check_installed_resources "$broken/agents/skills" "$broken/claude/skills")"; then
+    fail "installation validation passed with a broken installed sibling"
+  fi
+  case "$broken_message" in
+    *fast-track-ai-spec/scripts/fast-track-ai-gate.sh*) ;;
+    *) fail "broken sibling was not reported at its location: $broken_message";;
+  esac
   pass "install"
 }
 
@@ -1403,12 +1915,27 @@ EOF
 run_isolation() {
   iso="$work/isolation"
   mkdir -p "$iso"
-  for item in skills commands install.sh AGENTS.md evals; do
+  for item in skills commands install.sh AGENTS.md README.md evals; do
     cp -R "$repo_root/$item" "$iso/$item"
   done
   [ ! -e "$iso/fast-track-ai" ] || fail "isolation copy unexpectedly contains fast-track-ai/"
   FAST_TRACK_AI_ISOLATION_GUARD=1 bash "$iso/evals/run-evals.sh" all >/dev/null
   pass "isolation"
+}
+
+run_docs() {
+  readme="$repo_root/README.md"
+  agents="$repo_root/AGENTS.md"
+  [ ! -e "$repo_root/fast-track-ai" ] || fail "repository root unexpectedly has fast-track-ai/"
+  if grep -Eiq 'normaliz|\bactive\b|(^|[^a-z-])spec/|plan\.md|openspec' "$readme"; then
+    fail "$readme mentions retired wording or OpenSpec"
+  fi
+  assert_contains "$readme" "## Group"
+  assert_contains "$readme" "docs/archive/"
+  assert_contains "$agents" "openspec/"
+  assert_contains "$agents" "docs/archive/"
+  assert_not_contains "$agents" "read-only archive"
+  pass "docs"
 }
 
 run_case() {
@@ -1428,12 +1955,13 @@ run_case() {
     active) run_active ;;
     frontmatter) run_frontmatter ;;
     isolation) run_isolation ;;
+    docs) run_docs ;;
     *) fail "unknown eval: $1" ;;
   esac
 }
 
 if [ "$mode" = "all" ]; then
-  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow active frontmatter isolation; do
+  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow active frontmatter isolation docs; do
     if [ "$eval_name" = "isolation" ] && [ "${FAST_TRACK_AI_ISOLATION_GUARD:-}" = "1" ]; then
       continue
     fi

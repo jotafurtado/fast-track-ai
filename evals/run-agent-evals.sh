@@ -1,28 +1,32 @@
 #!/usr/bin/env bash
 # run-agent-evals.sh runs optional, maintainer-only real-agent evaluations of the
-# fast-track-ai workflow through the Kiro adapter in disposable repositories.
-# It is never called by run-evals.sh and never gates it.
+# fast-track-ai workflow through a harness adapter (Kiro, Claude Code, or Codex)
+# in disposable repositories. It is never called by run-evals.sh and never gates it.
 #
-# Usage: run-agent-evals.sh <selector> [--model MODEL] [--effort EFFORT]
-#                           [--timeout SECONDS] [--keep-dir DIR]
+# Usage: run-agent-evals.sh <selector> [--harness kiro|claude|codex] [--model MODEL]
+#                           [--effort EFFORT] [--timeout SECONDS] [--keep-dir DIR]
 # Selectors: compat revision approval failed-validation material-change resume all
 # Environment defaults: FAST_TRACK_AI_AGENT_MODEL, FAST_TRACK_AI_AGENT_EFFORT,
-#   FAST_TRACK_AI_AGENT_TIMEOUT (seconds per turn, default 900), KIRO_CLI (default kiro-cli).
+#   FAST_TRACK_AI_AGENT_TIMEOUT (seconds per turn, default 900), KIRO_CLI (default
+#   kiro-cli), CLAUDE_CLI (default claude), CODEX_CLI (default codex).
 #
 # Each scenario prints one line: RESULT: <scenario> <pass|fail|inconclusive|prerequisite-unavailable>: <reason>
+# A HARNESS: line precedes the results. Diagnostics live under <root>/<harness>/<scenario>.
 # Exit codes: 0 no assertion failed (pass, inconclusive, or prerequisite-unavailable),
 #             1 at least one scenario failed an assertion, 2 usage error.
+# Exit zero is not package readiness: only a `pass` for every required cell is.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 agent_dir="$repo_root/evals/agent"
-adapter="$agent_dir/kiro-adapter.sh"
 fixtures="$agent_dir/fixtures"
 init_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-init.sh"
 index_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-index.sh"
 gate="$repo_root/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+# shellcheck source=agent/lib.sh
+. "$agent_dir/lib.sh"
 
-kiro_cli="${KIRO_CLI:-kiro-cli}"
+harness="kiro"
 model="${FAST_TRACK_AI_AGENT_MODEL:-}"
 effort="${FAST_TRACK_AI_AGENT_EFFORT:-}"
 timeout_seconds="${FAST_TRACK_AI_AGENT_TIMEOUT:-900}"
@@ -35,12 +39,13 @@ continuation_scenarios="revision approval material-change"
 
 usage() {
   echo "ERROR: $1" >&2
-  echo "Usage: run-agent-evals.sh <compat|revision|approval|failed-validation|material-change|resume|all> [--model MODEL] [--effort EFFORT] [--timeout SECONDS] [--keep-dir DIR]" >&2
+  echo "Usage: run-agent-evals.sh <compat|revision|approval|failed-validation|material-change|resume|all> [--harness kiro|claude|codex] [--model MODEL] [--effort EFFORT] [--timeout SECONDS] [--keep-dir DIR]" >&2
   exit 2
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --harness) harness="${2:-}"; shift 2;;
     --model) model="${2:-}"; shift 2;;
     --effort) effort="${2:-}"; shift 2;;
     --timeout) timeout_seconds="${2:-}"; shift 2;;
@@ -60,6 +65,19 @@ else
   case " $all_scenarios " in *" $selector "*) selected="$selector";; *) usage "unknown selector: $selector";; esac
 fi
 
+# Harness dispatch: adapter, executable, native skill-discovery directory, label,
+# and the effort levels the harness CLI documents. Unknown harnesses and
+# unsupported settings are rejected before any agent starts.
+case "$harness" in
+  kiro) adapter="$agent_dir/kiro-adapter.sh"; cli_var=KIRO_CLI; cli="${KIRO_CLI:-kiro-cli}"; native_dir=.kiro; label="Kiro CLI"; effort_levels="low medium high xhigh max";;
+  claude) adapter="$agent_dir/claude-adapter.sh"; cli_var=CLAUDE_CLI; cli="${CLAUDE_CLI:-claude}"; native_dir=.claude; label="Claude Code CLI"; effort_levels="low medium high xhigh max";;
+  codex) adapter="$agent_dir/codex-adapter.sh"; cli_var=CODEX_CLI; cli="${CODEX_CLI:-codex}"; native_dir=.agents; label="Codex CLI"; effort_levels="none minimal low medium high xhigh max";;
+  *) usage "unknown harness: ${harness:-<empty>} (expected kiro, claude, or codex)";;
+esac
+if [ -n "$effort" ]; then
+  case " $effort_levels " in *" $effort "*) ;; *) usage "effort '$effort' is not supported by $harness (supported: $effort_levels)";; esac
+fi
+
 if [ -n "$keep_dir" ]; then
   mkdir -p "$keep_dir"
   diag_root="$(cd "$keep_dir" && pwd)"
@@ -73,6 +91,8 @@ count_fail=0
 count_inconclusive=0
 count_prereq=0
 retained=0
+
+echo "HARNESS: $harness"
 
 finish() {
   echo "SUMMARY: pass=$count_pass fail=$count_fail inconclusive=$count_inconclusive prerequisite-unavailable=$count_prereq"
@@ -95,11 +115,11 @@ record_result() {
     inconclusive) count_inconclusive=$((count_inconclusive + 1));;
     prerequisite-unavailable) count_prereq=$((count_prereq + 1));;
   esac
-  scenario_dir="$diag_root/$scenario"
+  scenario_dir="$diag_root/$harness/$scenario"
   if [ -d "$scenario_dir" ]; then
-    jq -n -c --arg scenario "$scenario" --arg result "$classification" --arg reason "$reason" \
+    jq -n -c --arg harness "$harness" --arg scenario "$scenario" --arg result "$classification" --arg reason "$reason" \
       --arg model "$model" --arg effort "$effort" --argjson timeout "$timeout_seconds" \
-      '{scenario: $scenario, result: $result, reason: $reason, model: $model, effort: $effort, timeoutSeconds: $timeout}' >"$scenario_dir/result.json"
+      '{harness: $harness, scenario: $scenario, result: $result, reason: $reason, model: $model, effort: $effort, timeoutSeconds: $timeout}' >"$scenario_dir/result.json"
     if [ "$classification" = "pass" ] && [ -z "$keep_dir" ]; then
       rm -rf "$scenario_dir"
     else
@@ -109,12 +129,18 @@ record_result() {
   fi
 }
 
+# prerequisite_reason: the missing prerequisite of the selected harness, or empty.
+# The executable and tools are checked before any CLI is invoked.
 prerequisite_reason() {
-  command -v "$kiro_cli" >/dev/null 2>&1 || { echo "Kiro CLI not found: $kiro_cli"; return; }
+  command -v "$cli" >/dev/null 2>&1 || { echo "$label not found: $cli"; return; }
   for tool in jq rsync shasum git; do
     command -v "$tool" >/dev/null 2>&1 || { echo "required tool not found: $tool"; return; }
   done
-  "$kiro_cli" whoami >/dev/null 2>&1 </dev/null || { echo "Kiro CLI is not authenticated ($kiro_cli whoami failed); run kiro-cli login"; return; }
+  case "$harness" in
+    kiro) "$cli" whoami >/dev/null 2>&1 </dev/null || { echo "$label is not authenticated ($cli whoami failed); run kiro-cli login"; return;};;
+    claude) "$cli" auth status 2>/dev/null </dev/null | jq -e '.loggedIn == true' >/dev/null 2>&1 || { echo "$label is not authenticated ($cli auth status does not report loggedIn); run claude auth login"; return;};;
+    codex) "$cli" login status >/dev/null 2>&1 </dev/null || { echo "$label is not authenticated ($cli login status failed); run codex login"; return;};;
+  esac
   echo ""
 }
 
@@ -125,6 +151,8 @@ if [ -n "$missing_prerequisite" ]; then
   done
   finish
 fi
+
+cli_version="$("$cli" --version 2>/dev/null </dev/null | head -1 || true)"
 
 # ---------------------------------------------------------------------------
 # Per-scenario assertion state. Verdicts come only from checkpoints, method
@@ -169,40 +197,55 @@ verdict() {
   fi
 }
 
+# stage_turns <scenario>: copies the canonical turn prompts into the scenario
+# directory. The first sentence naming "this repository" gains the discovery
+# location hint of the selected harness; decisions, continuation inputs, and every
+# other prompt stay byte-identical to the fixtures.
+stage_turns() {
+  local scenario="$1" file
+  turns_staged="$sdir/turns"
+  mkdir -p "$turns_staged"
+  for file in "$fixtures/$scenario/turns"/turn-*.txt; do
+    awk -v hint="The skill is available under $native_dir/skills/." '
+      !done && (i = index($0, " in this repository.")) > 0 { $0 = substr($0, 1, i + 19) " " hint substr($0, i + 20); done = 1 }
+      { print }' "$file" >"$turns_staged/$(basename "$file")"
+  done
+}
+
 # prepare_workspace <scenario> <method|plain>
 prepare_workspace() {
-  local scenario="$1" kind="$2"
-  sdir="$diag_root/$scenario"
+  local scenario="$1" kind="$2" skill
+  sdir="$diag_root/$harness/$scenario"
   rm -rf "$sdir"
   mkdir -p "$sdir"
   ws="$sdir/workspace"
   evidence="$sdir/evidence"
   mkdir -p "$ws"
   : >"$sdir/assertions.log"
+  stage_turns "$scenario"
   if [ "$kind" = "method" ]; then
     "$init_script" "$ws" >/dev/null
     if [ -d "$fixtures/$scenario/workspace" ]; then
       rsync -a "$fixtures/$scenario/workspace/" "$ws/"
     fi
     "$index_script" "$ws" >/dev/null
-    mkdir -p "$ws/.kiro/skills"
+    mkdir -p "$ws/$native_dir/skills"
     for skill in "$repo_root"/skills/fast-track-ai-*; do
-      cp -R "$skill" "$ws/.kiro/skills/"
+      cp -R "$skill" "$ws/$native_dir/skills/"
     done
   fi
   git -C "$ws" init -q
-  printf '.kiro/\n' >>"$ws/.git/info/exclude"
+  printf '.kiro/\n.claude/\n.agents/\n' >>"$ws/.git/info/exclude"
   git -C "$ws" add -A
-  git -C "$ws" -c user.name=fast-track-ai-eval -c user.email=eval@example.invalid commit -q --allow-empty -m "fixture baseline"
+  git -C "$ws" -c user.name=fast-track-ai-eval -c user.email=eval@example.invalid -c commit.gpgsign=false -c tag.gpgsign=false commit -q --allow-empty -m "fixture baseline"
 }
 
 run_turns() {
-  local scenario="$1"
-  adapter_args=(--workspace "$ws" --turns-dir "$fixtures/$scenario/turns" --out "$evidence" --timeout "$timeout_seconds")
+  adapter_args=(--workspace "$ws" --turns-dir "$turns_staged" --out "$evidence" --timeout "$timeout_seconds")
   [ -n "$model" ] && adapter_args+=(--model "$model")
   [ -n "$effort" ] && adapter_args+=(--effort "$effort")
   adapter_rc=0
-  KIRO_CLI="$kiro_cli" "$adapter" "${adapter_args[@]}" >"$sdir/adapter.log" 2>&1 || adapter_rc=$?
+  env "$cli_var=$cli" "$adapter" "${adapter_args[@]}" >"$sdir/adapter.log" 2>&1 || adapter_rc=$?
   [ "$adapter_rc" -eq 0 ] || assert_unknown "adapter exited $adapter_rc"
   return "$adapter_rc"
 }
@@ -219,7 +262,7 @@ require_turns() {
     case "$outcome" in
       success) ;;
       "") assert_unknown "turn $n did not run"; return 1;;
-      auth-failure) s_prereq="turn $n reported a Kiro authentication failure"; return 1;;
+      auth-failure) s_prereq="turn $n reported a $label authentication failure"; return 1;;
       timeout) assert_unknown "turn $n timed out after ${timeout_seconds}s"; return 1;;
       *) assert_unknown "turn $n outcome: $outcome"; return 1;;
     esac
@@ -248,25 +291,18 @@ status_at() {
   awk '/^---$/{section++; next} section == 1 && index($0, "status:") == 1 { sub("^status:[[:space:]]*", ""); print; exit }' "$file"
 }
 
+# jq_actions <turn> <jq args...>: jq over the turn's normalized action array.
 jq_actions() {
-  file="$(actions_file "$1")"; shift
-  if [ -s "$file" ]; then
-    jq -s -r "$@" "$file"
-  else
-    printf '[]' | jq -r "$@"
-  fi
+  local n="$1"; shift
+  ftai_actions "$(actions_file "$n")" "$@"
 }
 
-product_path_filter='(startswith("fast-track-ai/") or startswith("/") or startswith(".kiro/") or startswith(".git/")) | not'
+turn_complete() { ftai_turn_complete "$evidence/turns.jsonl" "$1"; }
+turn_incomplete_reasons() { ftai_turn_incomplete_reasons "$evidence/turns.jsonl" "$1"; }
 
-product_edit_count() { jq_actions "$1" "[.[] | select(.kind == \"edit\") | select(any(.paths[]; $product_path_filter))] | length"; }
-first_product_edit_seq() { jq_actions "$1" "[.[] | select(.kind == \"edit\") | select(any(.paths[]; $product_path_filter)) | .seq] | min // empty"; }
-first_product_edit_paths() { jq_actions "$1" "[.[] | select(.kind == \"edit\") | select(any(.paths[]; $product_path_filter))] | min_by(.seq) // {paths: []} | .paths[] | select($product_path_filter)"; }
-edited_paths() { jq_actions "$1" '.[] | select(.kind == "edit") | .paths[]' | LC_ALL=C sort -u; }
+product_edit_count() { jq_actions "$1" "[.[] | select(.kind == \"edit\") | select(.status != \"failed\") | select(any(.paths[]; $FTAI_PRODUCT_FILTER))] | length"; }
+edited_paths() { jq_actions "$1" '.[] | select(.kind == "edit") | select(.status != "failed") | .paths[]' | LC_ALL=C sort -u; }
 shell_commands() { jq_actions "$1" '.[] | select(.kind == "execute") | .command // empty'; }
-approval_write_seq() {
-  jq_actions "$1" --arg path "$2" '[.[] | select(.kind == "edit") | select(any(.paths[]; . == $path)) | select((.input | tostring) | test("status: approved")) | .seq] | min // empty'
-}
 
 # uncovered_product_changes <from> <to> <turn>: product changes with no edit action.
 uncovered_product_changes() {
@@ -296,12 +332,16 @@ assert_no_product_change() {
   fi
 }
 
+# assert_no_product_edit_action <turn>: a recorded product edit fails; absence of
+# edits passes only when the turn's action stream is complete enough to prove it.
 assert_no_product_edit_action() {
   edits="$(product_edit_count "$1")"
-  if [ "${edits:-0}" -eq 0 ]; then
-    assert_ok "no product edit action in turn $1"
-  else
+  if [ "${edits:-0}" -gt 0 ]; then
     assert_bad "$edits product edit actions recorded in turn $1"
+  elif [ "$(turn_complete "$1")" != "true" ]; then
+    assert_unknown "turn $1 action stream is incomplete ($(turn_incomplete_reasons "$1")); absence of product edit actions not verified"
+  else
+    assert_ok "no product edit action in turn $1"
   fi
 }
 
@@ -323,7 +363,23 @@ assert_not_shipped() {
   fi
 }
 
-# task_checkbox <checkpoint> <track> <task label>: prints x, space, or missing.
+# assert_staged_skill <skill>: the evaluated skill was loaded from the staged
+# package under the harness's native discovery directory, proven by native tool
+# evidence. A copy loaded from anywhere else never counts as the evaluated package.
+assert_staged_skill() {
+  local skill="$1" staged outside
+  staged="$(jq -s -r --arg s "$skill" '[.[] | (.skillLoads // [])[] | select(.skill == $s and .staged == true)] | length' "$evidence/turns.jsonl" 2>/dev/null || echo 0)"
+  outside="$(jq -s -r --arg s "$skill" '[.[] | (.skillLoads // [])[] | select(.skill == $s and .staged == false) | .path] | join(", ")' "$evidence/turns.jsonl" 2>/dev/null || true)"
+  if [ "${staged:-0}" -gt 0 ]; then
+    assert_ok "$skill was loaded from the staged $native_dir/skills location"
+  elif [ -n "$outside" ]; then
+    assert_unknown "$skill was loaded only from outside the staged package ($outside)"
+  else
+    assert_unknown "no machine-verifiable load of the staged $skill was observed"
+  fi
+}
+
+# task_checkbox <checkpoint> <track> <task label>: prints open, checked, or missing.
 task_checkbox() {
   awk -v label="$3" 'index($0, label) && match($0, /^[[:space:]]*- \[[ xX]\]/) { c = substr($0, RSTART + RLENGTH - 2, 1); print (c == " " ? "open" : "checked"); found = 1; exit } END { if (!found) print "missing" }' \
     "$(checkpoint_dir "$1")/fast-track-ai/tracks/$2/tasks.md" 2>/dev/null || echo missing
@@ -338,14 +394,14 @@ compat_reason=""
 scenario_compat() {
   reset_assertions
   prepare_workspace compat plain
-  run_turns compat || true
+  run_turns || true
   expected_token="$(tr -d '[:space:]' <"$fixtures/compat/expected-token")"
   first="$(turn_field 1 outcome)"
   second="$(turn_field 2 outcome)"
   first_session="$(turn_field 1 sessionId)"
   second_session="$(turn_field 2 sessionId)"
   if [ "$first" = "auth-failure" ] || [ "$second" = "auth-failure" ]; then
-    compat_result="auth-failure"; compat_reason="Kiro reported an authentication failure"
+    compat_result="auth-failure"; compat_reason="$label reported an authentication failure"
   elif [ "$first" = "timeout" ] || [ "$second" = "timeout" ]; then
     compat_result="timeout"; compat_reason="a compat turn exceeded ${timeout_seconds}s"
   elif [ "$first" != "success" ]; then
@@ -362,8 +418,8 @@ scenario_compat() {
     compat_result="supported"; compat_reason="session $first_session resumed with a subsequent prompt"
   fi
   mkdir -p "$evidence"
-  jq -n -c --arg result "$compat_result" --arg reason "$compat_reason" --arg version "$("$kiro_cli" --version 2>/dev/null || true)" \
-    '{capability: "headless-continuation", result: $result, reason: $reason, kiroVersion: $version}' >"$evidence/capability.json"
+  jq -n -c --arg harness "$harness" --arg result "$compat_result" --arg reason "$compat_reason" --arg version "$cli_version" \
+    '{capability: "headless-continuation", harness: $harness, result: $result, reason: $reason, cliVersion: $version}' >"$evidence/capability.json"
   echo "CAPABILITY $compat_result $compat_reason" >>"$sdir/assertions.log"
   case "$compat_result" in
     supported) record_result compat pass "headless continuation supported: $compat_reason";;
@@ -383,7 +439,8 @@ scenario_revision() {
   reset_assertions
   prepare_workspace revision method
   track=001-greeting
-  if run_turns revision && require_turns 2; then
+  if run_turns && require_turns 2; then
+    assert_staged_skill fast-track-ai-spec
     if [ "$(status_at 1 "fast-track-ai/tracks/$track/spec.md")" = "missing" ] || [ "$(status_at 1 "fast-track-ai/tracks/$track/tasks.md")" = "missing" ]; then
       assert_unknown "turn 1 did not write spec.md and tasks.md"
     else
@@ -403,31 +460,29 @@ scenario_approval() {
   reset_assertions
   prepare_workspace approval method
   track=001-greeting
-  if run_turns approval && require_turns 2; then
+  if run_turns && require_turns 2; then
+    assert_staged_skill fast-track-ai-spec
     if [ "$(status_at 1 "fast-track-ai/tracks/$track/spec.md")" = "missing" ] || [ "$(status_at 1 "fast-track-ai/tracks/$track/tasks.md")" = "missing" ]; then
       assert_unknown "turn 1 did not write spec.md and tasks.md"
     else
       assert_planning_status 1 draft "$track"
       assert_no_product_change 0 1
       assert_planning_status 2 approved "$track"
-      # Order: approval writes precede the first product edit, when observable.
-      if [ "$(turn_field 2 ordered)" != "true" ]; then
-        assert_unknown "turn 2 event stream is incomplete; approval order not verified"
+      # Order: approval writes precede the first product edit, when the native
+      # stream proves it. Batched, concurrent, or unobserved edits prove nothing.
+      if [ "$(turn_complete 2)" != "true" ]; then
+        assert_unknown "turn 2 action stream is incomplete ($(turn_incomplete_reasons 2)); approval order not verified"
       elif [ -z "$(product_changes 1 2)" ]; then
         assert_unknown "no implementation product change after approval; approval order not verified"
       elif [ -n "$(uncovered_product_changes 1 2 2)" ]; then
         assert_unknown "product changes without an edit action ($(uncovered_product_changes 1 2 2 | tr '\n' ' ')); approval order not verified"
       else
-        spec_seq="$(approval_write_seq 2 "fast-track-ai/tracks/$track/spec.md")"
-        tasks_seq="$(approval_write_seq 2 "fast-track-ai/tracks/$track/tasks.md")"
-        product_seq="$(first_product_edit_seq 2)"
-        if [ -z "$spec_seq" ] || [ -z "$tasks_seq" ]; then
-          assert_unknown "approval write not observable as an edit action (spec seq '${spec_seq}', tasks seq '${tasks_seq}'); approval order not verified"
-        elif [ "$spec_seq" -lt "$product_seq" ] && [ "$tasks_seq" -lt "$product_seq" ]; then
-          assert_ok "approval writes (seq $spec_seq, $tasks_seq) precede the first product edit (seq $product_seq)"
-        else
-          assert_bad "first product edit (seq $product_seq) precedes an approval write (seq $spec_seq, $tasks_seq)"
-        fi
+        order="$(ftai_approval_order "$(actions_file 2)" "fast-track-ai/tracks/$track/spec.md" "fast-track-ai/tracks/$track/tasks.md")"
+        case "$order" in
+          ok) assert_ok "separate completed approval writes finished before every product edit started";;
+          violation) assert_bad "a product edit started before an approval write completed";;
+          *) assert_unknown "${order#unproven: }; approval order not verified";;
+        esac
       fi
     fi
   fi
@@ -438,15 +493,16 @@ scenario_failed_validation() {
   reset_assertions
   prepare_workspace failed-validation method
   track=001-greeting
-  if run_turns failed-validation && require_turns 1; then
+  if run_turns && require_turns 1; then
+    assert_staged_skill fast-track-ai-implement
     if shell_commands 1 | grep -Fq 'check-greeting.sh'; then
       assert_ok "the failing Validate command ran"
     else
       assert_unknown "the failing Validate command was not observed running"
     fi
-    for label in "Task 1 (Phase 1)" "Task 2 (Phase 2)"; do
-      box="$(task_checkbox 1 "$track" "$label")"
-      if [ "$box" = "open" ]; then assert_ok "$label stays open"; else assert_bad "$label is $box"; fi
+    for label_text in "Task 1 (Phase 1)" "Task 2 (Phase 2)"; do
+      box="$(task_checkbox 1 "$track" "$label_text")"
+      if [ "$box" = "open" ]; then assert_ok "$label_text stays open"; else assert_bad "$label_text is $box"; fi
     done
     if [ -e "$(checkpoint_dir 1)/farewell.txt" ]; then
       assert_bad "dependent work started: farewell.txt exists"
@@ -455,6 +511,10 @@ scenario_failed_validation() {
     fi
     if edited_paths 1 | grep -Fxq 'farewell.txt'; then
       assert_bad "an edit action targeted dependent farewell.txt"
+    elif [ "$(turn_complete 1)" != "true" ]; then
+      assert_unknown "turn 1 action stream is incomplete ($(turn_incomplete_reasons 1)); absence of an edit of farewell.txt not verified"
+    elif [ "$(ftai_shell_may_mutate "$(actions_file 1)" farewell.txt)" = "yes" ]; then
+      assert_unknown "a shell command mentions farewell.txt with a mutating construct; absence of an edit not verified"
     else
       assert_ok "no edit action targeted dependent farewell.txt"
     fi
@@ -487,7 +547,8 @@ scenario_material_change() {
   reset_assertions
   prepare_workspace material-change method
   track=001-greeting
-  if run_turns material-change && require_turns 1; then
+  if run_turns && require_turns 1; then
+    assert_staged_skill fast-track-ai-implement
     assert_planning_status 1 draft "$track"
     assert_no_product_change 0 1
     assert_no_product_edit_action 1
@@ -501,9 +562,13 @@ scenario_resume() {
   reset_assertions
   prepare_workspace resume method
   track=001-letters
-  if run_turns resume && require_turns 1; then
-    if [ -e "$(checkpoint_dir 1)/.eval-validate-alpha-ran" ] || shell_commands 1 | grep -Fq 'validate-alpha.sh'; then
+  if run_turns && require_turns 1; then
+    assert_staged_skill fast-track-ai-implement
+    validation_execution="$(ftai_validation_execution "$(actions_file 1)" scripts/validate-alpha.sh FTAI_VALIDATION_EXECUTED:resume:alpha "$(cat "$(checkpoint_dir 0)/scripts/validate-alpha.sh")")"
+    if [ -e "$(checkpoint_dir 1)/.eval-validate-alpha-ran" ] || [ "$validation_execution" = "executed" ]; then
       assert_bad "the checked Task 1 Validate was rerun"
+    elif [ "$(turn_complete 1)" != "true" ] || [ "$validation_execution" = "unproven" ]; then
+      assert_unknown "the checked Task 1 Validate has an opaque or unobserved invocation reference"
     else
       assert_ok "the checked Task 1 Validate was not rerun"
     fi
@@ -512,15 +577,17 @@ scenario_resume() {
     if [ "$box" = "checked" ]; then assert_ok "Task 1 stays checked"; else assert_bad "Task 1 is $box"; fi
     if [ ! -e "$(checkpoint_dir 1)/beta.txt" ] && [ "$(task_checkbox 1 "$track" "Task 2 (Phase 1)")" != "checked" ]; then
       assert_unknown "the agent did not progress on the first open task"
-    elif [ "$(turn_field 1 ordered)" != "true" ]; then
-      assert_unknown "turn 1 event stream is incomplete; task order not verified"
+    elif [ "$(turn_complete 1)" != "true" ]; then
+      assert_unknown "turn 1 action stream is incomplete ($(turn_incomplete_reasons 1)); task order not verified"
     elif [ -n "$(uncovered_product_changes 0 1 1)" ]; then
       assert_unknown "product changes without an edit action ($(uncovered_product_changes 0 1 1 | tr '\n' ' ')); task order not verified"
     else
-      first_paths="$(first_product_edit_paths 1 | tr '\n' ' ')"
-      case " $first_paths " in
-        *" beta.txt "*) assert_ok "the first product edit targets the first open task (beta.txt)";;
-        *) assert_bad "the first product edit targets '${first_paths}', expected beta.txt";;
+      order="$(ftai_first_edit "$(actions_file 1)" beta.txt)"
+      case "$order" in
+        ok) assert_ok "every other product edit is proven to follow the edit of the first open task (beta.txt)";;
+        violation) assert_bad "a product edit other than beta.txt completed before the edit of beta.txt";;
+        missing) assert_bad "no product edit action targeted the first open task (beta.txt)";;
+        *) assert_unknown "${order#unproven: }; task order not verified";;
       esac
     fi
   fi

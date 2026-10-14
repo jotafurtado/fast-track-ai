@@ -30,8 +30,6 @@ Diga ao agente: `setup fast-track-ai`, `install fast-track-ai` ou `init the meth
 
 O script `skills/fast-track-ai-init/scripts/fast-track-ai-init.sh` cria a árvore e o bloco gerenciado em `AGENTS.md`. Em seguida `fast-track-ai-index.sh` gera `fast-track-ai/INDEX.md`.
 
-Se o repositório alvo já tem tracks, o init checa cada uma com o gate e lista as que não conformam. Ele faz uma pergunta de sim ou não antes de normalizar qualquer track e não muda nada até você responder.
-
 Leia o `INDEX.md` antes de procurar track, ref, research, assessment, decision ou handoff. Ele é gerado. Edição manual se perde na próxima geração.
 
 ## Ciclo de uma mudança
@@ -143,7 +141,7 @@ flowchart LR
   A --> B
 ```
 
-Tasks do mesmo `## Group` rodam juntas. Cada uma tem `Files` e `Validate`. Arquivos disjuntos, sem dependência de dados.
+O `tasks.md` exige ao menos um header `## Group`. Tasks do mesmo grupo rodam juntas. Cada uma tem `Files` e `Validate`. Arquivos disjuntos, sem dependência de dados.
 
 Grupo seguinte declara `(depends: Nome)` no título e espera o anterior. Na dúvida, o agente separa em grupos sequenciais. O mesmo arquivo não é editado em paralelo.
 
@@ -161,7 +159,7 @@ stateDiagram-v2
 
 Isso é o `status` do `intent.md`. `spec.md` e `tasks.md` usam `draft` e depois `approved` no ponto da spec.
 
-`dropped` encerra sem implementação. `superseded` exige `superseded_by` dito por você. O agente não inventa esse campo. `active` não é status novo.
+`dropped` encerra sem implementação. `superseded` exige `superseded_by` dito por você. O agente não inventa esse campo.
 
 ## Gate
 
@@ -175,9 +173,9 @@ Depois da implementação, `PASS` exige:
 2. `spec.md` e `tasks.md` com `status: approved`.
 3. `Files:` e `Accept:` na spec. `Files:` e `Validate:` nas tasks.
 4. Nenhuma task `- [ ]`.
-5. Sem `plan.md`. Sem arquivo solto na raiz da track.
+5. Sem arquivo solto na raiz da track.
 
-Raiz da track: `intent.md`, `spec.md`, `tasks.md` e `assets/`. Saída auxiliar vai em `assets/`. Pasta `spec/` antiga não escolhe o ciclo.
+Raiz da track: `intent.md`, `spec.md`, `tasks.md` e `assets/`. Saída auxiliar vai em `assets/`.
 
 A review olha o diff contra a spec. Severidade: `[blocking]` corrige antes de seguir, `[important]` deve corrigir, `[nit]` é opcional, `[suggestion]` é alternativa.
 
@@ -188,17 +186,35 @@ commands/                 wrappers dos 7 comandos
 skills/fast-track-ai-*/   skill, template e script de cada comando
 install.sh                links no harness
 evals/                    suite de evals do mantenedor
+docs/archive/             histórico congelado de como o pacote foi construído
 ```
 
 Cada script e cada template tem uma skill dona. Outra skill aponta para a cópia da dona. Não existe pasta `shared`.
+
+## Validação
+
+A suíte determinística verifica instalação, recursos e scripts em projetos descartáveis, sem chamar modelos:
+
+```bash
+bash evals/run-evals.sh all
+```
+
+As sessões reais são opcionais e consomem a cota do harness selecionado:
+
+```bash
+bash evals/run-agent-evals.sh all --harness kiro
+bash evals/run-agent-evals.sh all --harness claude
+bash evals/run-agent-evals.sh all --harness codex
+```
+
+Use `--model` e `--effort` para fixar a configuração avaliada. `.agents` é validado como instalação e resolução de recursos, não como um quarto executável. Resultados e limitações ficam em [`evals/evals.md`](evals/evals.md); exit code zero também pode significar resultado inconclusivo e não aprova o pacote.
 
 ## Onde o ciclo quebra
 
 1. Implementar com spec ou tasks em `draft`. A skill recusa.
 2. Tratar o ponto do intent como aprovação. O intent segue `draft` até o ship.
 3. Editar `INDEX.md` na mão.
-4. Gravar `plan.md` na track. O gate falha.
-5. Shipar porque os checkboxes fecharam. O ship é o ponto depois do resumo de implementação.
+4. Shipar porque os checkboxes fecharam. O ship é o ponto depois do resumo de implementação.
 
 ## Licença
 
