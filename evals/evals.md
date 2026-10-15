@@ -10,7 +10,7 @@ Run every deterministic check from the repository root:
 bash evals/run-evals.sh all
 ```
 
-Run one selector by replacing `all` with its name. Every selector uses a fresh temporary fixture and removes it on exit. No selector reads the archived history under `docs/archive/fast-track-ai/`.
+Run one selector by replacing `all` with its name. Every selector uses a fresh temporary fixture and removes it on exit. No selector reads the archived history under `.archive/fast-track-ai/`.
 
 | Selector | Observable Contract | Expected Exit | Result |
 |----------|---------------------|---------------|--------|
@@ -29,7 +29,6 @@ Run one selector by replacing `all` with its name. Every selector uses a fresh t
 | `active` | No live skill, template, or command file contains `status: active`, and an intent with `status: active` fails the index with `invalid status: active` and leaves `INDEX.md` unchanged | 0 | PASS |
 | `frontmatter` | Index and gate reject the same malformed fixtures (unclosed block, duplicate key, indented list line) with the same rule text, a `---` pair below line 1 yields no fields, every index rejection leaves `INDEX.md` byte-identical, and every frontmatter template fits the canonical subset | 0 | PASS |
 | `isolation` | A copy of `skills/`, `commands/`, `install.sh`, `AGENTS.md`, `README.md`, and `evals/` without `docs/` or a root `fast-track-ai/` passes `run-evals.sh all` | 0 | PASS |
-| `docs` | The repository root has no `fast-track-ai/`; `README.md` has no retired wording (`normaliz`, `active`, `spec/`, `plan.md`) and no `openspec`, states the `## Group` requirement, and lists `docs/archive/`; `AGENTS.md` lists `openspec/` and `docs/archive/` and no longer calls a tree a read-only archive | 0 | PASS |
 
 ## Behavioral Fixtures
 
@@ -99,7 +98,7 @@ Supported efforts: Kiro and Claude Code `low medium high xhigh max`; Codex `none
 
 ### Isolation
 
-Each scenario gets a fresh workspace: `fast-track-ai-init.sh`, the fixture overlay from `evals/agent/fixtures/<scenario>/workspace/`, `fast-track-ai-index.sh`, a copy (never a symlink) of `skills/fast-track-ai-*` under the selected harness's native skill directory (`.kiro/skills/`, `.claude/skills/`, or `.agents/skills/`), and a baseline git commit with signing disabled. No installed skill or command is required and the archived history under `docs/archive/fast-track-ai/` is never read. The `compat` workspace is an empty git repository.
+Each scenario gets a fresh workspace: `fast-track-ai-init.sh`, the fixture overlay from `evals/agent/fixtures/<scenario>/workspace/`, `fast-track-ai-index.sh`, a copy (never a symlink) of `skills/ft-*` under the selected harness's native skill directory (`.kiro/skills/`, `.claude/skills/`, or `.agents/skills/`), and a baseline git commit with signing disabled. No installed skill or command is required and the archived history under `.archive/fast-track-ai/` is never read. The `compat` workspace is an empty git repository.
 
 The canonical turn prompts in `evals/agent/fixtures/<scenario>/turns/` name no harness. The runner stages a copy per scenario and adds only the sentence `The skill is available under <native dir>/skills/.` after the first `in this repository.`; user decisions and continuation inputs such as `.` stay byte-identical. Prompts do not paste skill bodies or force a tool choice.
 
@@ -277,3 +276,7 @@ Corrections: task-scoped checks follow the resume rule; approval completes as an
 No general shell observer was added. DEBUG/startup experiments exposed opaque pipelines/subshells and replaceable hooks, so those experiments did not justify a reliable mutation audit. Shell-only ordering without sufficient native evidence, batched approval/product edits, missing output, and incomplete coverage still remain inconclusive.
 
 Readiness is limited to this package state and these explicit configurations. Earlier Haiku failures and earlier inconclusive runs remain diagnostic history, not approval of default settings or every model. Claude reports permission mode `dontAsk`; Codex reports `workspace-write` and approval policy `never`; Kiro uses its explicit trusted-tool mode. Inherited user configuration remains a limitation as described under Isolation.
+
+### Public skill rename
+
+Current skill and command names use `ft-*`. The readiness matrix, historical skill names, hashes, and fingerprint command above describe the package before this rename; they are retained evidence, not a new live-agent validation of the short names. New agent-eval runs are required to establish a readiness matrix for the renamed package.

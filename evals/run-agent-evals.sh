@@ -20,9 +20,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 agent_dir="$repo_root/evals/agent"
 fixtures="$agent_dir/fixtures"
-init_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-init.sh"
-index_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-index.sh"
-gate="$repo_root/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+init_script="$repo_root/skills/ft-init/scripts/fast-track-ai-init.sh"
+index_script="$repo_root/skills/ft-init/scripts/fast-track-ai-index.sh"
+gate="$repo_root/skills/ft-spec/scripts/fast-track-ai-gate.sh"
 # shellcheck source=agent/lib.sh
 . "$agent_dir/lib.sh"
 
@@ -230,7 +230,7 @@ prepare_workspace() {
     fi
     "$index_script" "$ws" >/dev/null
     mkdir -p "$ws/$native_dir/skills"
-    for skill in "$repo_root"/skills/fast-track-ai-*; do
+    for skill in "$repo_root"/skills/ft-*; do
       cp -R "$skill" "$ws/$native_dir/skills/"
     done
   fi
@@ -440,7 +440,7 @@ scenario_revision() {
   prepare_workspace revision method
   track=001-greeting
   if run_turns && require_turns 2; then
-    assert_staged_skill fast-track-ai-spec
+    assert_staged_skill ft-spec
     if [ "$(status_at 1 "fast-track-ai/tracks/$track/spec.md")" = "missing" ] || [ "$(status_at 1 "fast-track-ai/tracks/$track/tasks.md")" = "missing" ]; then
       assert_unknown "turn 1 did not write spec.md and tasks.md"
     else
@@ -461,7 +461,7 @@ scenario_approval() {
   prepare_workspace approval method
   track=001-greeting
   if run_turns && require_turns 2; then
-    assert_staged_skill fast-track-ai-spec
+    assert_staged_skill ft-spec
     if [ "$(status_at 1 "fast-track-ai/tracks/$track/spec.md")" = "missing" ] || [ "$(status_at 1 "fast-track-ai/tracks/$track/tasks.md")" = "missing" ]; then
       assert_unknown "turn 1 did not write spec.md and tasks.md"
     else
@@ -494,7 +494,7 @@ scenario_failed_validation() {
   prepare_workspace failed-validation method
   track=001-greeting
   if run_turns && require_turns 1; then
-    assert_staged_skill fast-track-ai-implement
+    assert_staged_skill ft-implement
     if shell_commands 1 | grep -Fq 'check-greeting.sh'; then
       assert_ok "the failing Validate command ran"
     else
@@ -548,7 +548,7 @@ scenario_material_change() {
   prepare_workspace material-change method
   track=001-greeting
   if run_turns && require_turns 1; then
-    assert_staged_skill fast-track-ai-implement
+    assert_staged_skill ft-implement
     assert_planning_status 1 draft "$track"
     assert_no_product_change 0 1
     assert_no_product_edit_action 1
@@ -563,7 +563,7 @@ scenario_resume() {
   prepare_workspace resume method
   track=001-letters
   if run_turns && require_turns 1; then
-    assert_staged_skill fast-track-ai-implement
+    assert_staged_skill ft-implement
     validation_execution="$(ftai_validation_execution "$(actions_file 1)" scripts/validate-alpha.sh FTAI_VALIDATION_EXECUTED:resume:alpha "$(cat "$(checkpoint_dir 0)/scripts/validate-alpha.sh")")"
     if [ -e "$(checkpoint_dir 1)/.eval-validate-alpha-ran" ] || [ "$validation_execution" = "executed" ]; then
       assert_bad "the checked Task 1 Validate was rerun"

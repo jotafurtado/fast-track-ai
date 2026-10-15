@@ -1,8 +1,0 @@
-PASS the failing Validate command ran
-PASS Task 1 (Phase 1) stays open
-PASS Task 2 (Phase 2) stays open
-FAIL dependent work started: farewell.txt exists
-FAIL an edit action targeted dependent farewell.txt
-PASS the failing Validate script is unchanged
-PASS intent is not shipped at checkpoint 1 (draft)
-PASS the completion gate rejects the track

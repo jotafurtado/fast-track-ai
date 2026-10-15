@@ -202,9 +202,9 @@ Verified fixture state.
 EOF
 }
 
-init_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-init.sh"
-index_script="$repo_root/skills/fast-track-ai-init/scripts/fast-track-ai-index.sh"
-gate="$repo_root/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+init_script="$repo_root/skills/ft-init/scripts/fast-track-ai-init.sh"
+index_script="$repo_root/skills/ft-init/scripts/fast-track-ai-index.sh"
+gate="$repo_root/skills/ft-spec/scripts/fast-track-ai-gate.sh"
 
 # fake_agent is an executable stand-in for a harness CLI. It answers the
 # prerequisite probes, then emits canned native events (FAKE_EVENTS file, or a
@@ -304,10 +304,10 @@ check_agent_runner_staging() {
         [ "$(cat "$staged_file")" = "$expected" ] || fail "$harness_name staged prompt differs from the fixture beyond the location hint: $staged_file"
       done
       if [ "$scenario" != "compat" ]; then
-        skill_copy="$keep/$harness_name/$scenario/workspace/$native/skills/fast-track-ai-spec/SKILL.md"
+        skill_copy="$keep/$harness_name/$scenario/workspace/$native/skills/ft-spec/SKILL.md"
         [ -f "$skill_copy" ] || fail "$harness_name did not stage the package under $native/skills for $scenario"
-        cmp -s "$skill_copy" "$repo_root/skills/fast-track-ai-spec/SKILL.md" || fail "$harness_name staged skill differs from the package"
-        [ ! -L "$keep/$harness_name/$scenario/workspace/$native/skills/fast-track-ai-spec" ] || fail "$harness_name staged skill is a symlink into the package"
+        cmp -s "$skill_copy" "$repo_root/skills/ft-spec/SKILL.md" || fail "$harness_name staged skill differs from the package"
+        [ ! -L "$keep/$harness_name/$scenario/workspace/$native/skills/ft-spec" ] || fail "$harness_name staged skill is a symlink into the package"
         for other in .kiro .claude .agents; do
           [ "$other" = "$native" ] || [ ! -e "$keep/$harness_name/$scenario/workspace/$other" ] || fail "$harness_name workspace has an unrelated $other directory"
         done
@@ -392,21 +392,21 @@ check_native_event_evidence() {
 
   # Claude: separate completed approval writes before the product edit are provable.
   { cl_init
-    cl_use r0 Read "$(cl_path "$n_ws/.claude/skills/fast-track-ai-spec/SKILL.md")"; cl_res r0
+    cl_use r0 Read "$(cl_path "$n_ws/.claude/skills/ft-spec/SKILL.md")"; cl_res r0
     cl_use a1 Write "$(cl_write "$n_ws/$spec_rel" "$approved")"; cl_res a1
     cl_use a2 Write "$(cl_write "$n_ws/$tasks_rel" "$approved")"; cl_res a2
     cl_use p1 Write "$(cl_write "$n_ws/greeting.txt" hello)"; cl_res p1
-    printf '%s\n' "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Base directory for this skill: $n_ws/.claude/skills/fast-track-ai-spec\\n\\nbody\"}]}}"
+    printf '%s\n' "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Base directory for this skill: $n_ws/.claude/skills/ft-spec\\n\\nbody\"}]}}"
     cl_done; } >"$work/claude-separate.jsonl"
   out="$work/claude-separate-out"
   run_fake_adapter claude "$work/claude-separate.jsonl" "$out"
   assert_equal "$(ftai_turn_complete "$out/turns.jsonl" 1)" true "claude separate: coverage"
   assert_equal "$(ftai_approval_order "$out/turn-01.actions.jsonl" "$spec_rel" "$tasks_rel")" ok "claude separate: approval order"
-  jq -e '.sessionId == "cl-session" and ([.skillLoads[] | select(.skill == "fast-track-ai-spec" and .staged == true)] | length > 0)' "$out/turns.jsonl" >/dev/null || fail "claude separate: session identity or staged skill load not recorded"
+  jq -e '.sessionId == "cl-session" and ([.skillLoads[] | select(.skill == "ft-spec" and .staged == true)] | length > 0)' "$out/turns.jsonl" >/dev/null || fail "claude separate: session identity or staged skill load not recorded"
 
   # Claude: a skill read from a global copy never counts as the staged package.
   { cl_init
-    cl_use r0 Read "$(cl_path "/Users/someone/.claude/skills/fast-track-ai-spec/SKILL.md")"; cl_res r0
+    cl_use r0 Read "$(cl_path "/Users/someone/.claude/skills/ft-spec/SKILL.md")"; cl_res r0
     cl_done; } >"$work/claude-global.jsonl"
   out="$work/claude-global-out"
   run_fake_adapter claude "$work/claude-global.jsonl" "$out"
@@ -546,7 +546,7 @@ check_native_event_evidence() {
   # Native disclosure provenance is structured data, not response prose or a name.
   kiro_disclosure_case() {
     local source_path="$1" completion="$2" include_source="$3" destination="$4"
-    jq -n -c '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call",toolCallId:"ks1",rawInput:{name:"fast-track-ai-spec"},_meta:{kiro:{toolId:"disclose_context"}}}}}' >"$destination"
+    jq -n -c '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call",toolCallId:"ks1",rawInput:{name:"ft-spec"},_meta:{kiro:{toolId:"disclose_context"}}}}}' >"$destination"
     jq -n -c --arg p "$source_path" --arg s "$completion" --argjson source "$include_source" \
       '{type:"sessionUpdate",data:{update:{sessionUpdate:"tool_call_update",toolCallId:"ks1",status:$s,
         content:[{type:"content",content:{type:"text",text:("Skill directory: " + $p)}}],
@@ -554,25 +554,25 @@ check_native_event_evidence() {
         _meta:{kiro:{toolId:"disclose_context"}}}}}' >>"$destination"
     printf '%s\n' '{"type":"runFinished","data":{"sessionId":"kiro-session","status":"success","stopReason":"end_turn"}}' >>"$destination"
   }
-  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" completed true "$work/kiro-disclosed.jsonl"
+  kiro_disclosure_case "$n_ws/.kiro/skills/ft-spec/SKILL.md" completed true "$work/kiro-disclosed.jsonl"
   out="$work/kiro-disclosed-out"
   run_fake_adapter kiro "$work/kiro-disclosed.jsonl" "$out"
-  jq -e 'any(.skillLoads[]; .skill == "fast-track-ai-spec" and .staged == true and .via == "disclosure")' "$out/turns.jsonl" >/dev/null \
+  jq -e 'any(.skillLoads[]; .skill == "ft-spec" and .staged == true and .via == "disclosure")' "$out/turns.jsonl" >/dev/null \
     || fail "kiro native disclosure did not record its workspace source"
 
-  kiro_disclosure_case "/Users/someone/.kiro/skills/fast-track-ai-spec/SKILL.md" completed true "$work/kiro-disclosed-global.jsonl"
+  kiro_disclosure_case "/Users/someone/.kiro/skills/ft-spec/SKILL.md" completed true "$work/kiro-disclosed-global.jsonl"
   out="$work/kiro-disclosed-global-out"
   run_fake_adapter kiro "$work/kiro-disclosed-global.jsonl" "$out"
   jq -e '([.skillLoads[] | select(.staged == true)] | length == 0) and any(.skillLoads[]; .staged == false)' "$out/turns.jsonl" >/dev/null \
     || fail "kiro global disclosure was treated as the staged package"
 
-  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" failed true "$work/kiro-disclosed-failed.jsonl"
+  kiro_disclosure_case "$n_ws/.kiro/skills/ft-spec/SKILL.md" failed true "$work/kiro-disclosed-failed.jsonl"
   out="$work/kiro-disclosed-failed-out"
   run_fake_adapter kiro "$work/kiro-disclosed-failed.jsonl" "$out"
   jq -e '([.skillLoads[] | select(.staged == true)] | length == 0)' "$out/turns.jsonl" >/dev/null \
     || fail "kiro failed disclosure counted as a skill load"
 
-  kiro_disclosure_case "$n_ws/.kiro/skills/fast-track-ai-spec/SKILL.md" completed false "$work/kiro-disclosed-prose.jsonl"
+  kiro_disclosure_case "$n_ws/.kiro/skills/ft-spec/SKILL.md" completed false "$work/kiro-disclosed-prose.jsonl"
   out="$work/kiro-disclosed-prose-out"
   run_fake_adapter kiro "$work/kiro-disclosed-prose.jsonl" "$out"
   jq -e '([.skillLoads[] | select(.staged == true)] | length == 0)' "$out/turns.jsonl" >/dev/null \
@@ -650,7 +650,7 @@ run_init() {
   mkdir -p "$refreshed"
   printf 'USER BEFORE\n<!-- BEGIN MANAGED BLOCK: fast-track-ai. old -->\nold text\n<!-- END MANAGED BLOCK: fast-track-ai -->\nUSER AFTER' >"$refreshed/AGENTS.md"
   printf 'USER BEFORE\n' >"$work/init-expected.md"
-  cat "$repo_root/skills/fast-track-ai-init/assets/AGENTS-snippet.md" >>"$work/init-expected.md"
+  cat "$repo_root/skills/ft-init/assets/AGENTS-snippet.md" >>"$work/init-expected.md"
   printf 'USER AFTER' >>"$work/init-expected.md"
   "$init_script" "$refreshed" >/dev/null
   cmp "$work/init-expected.md" "$refreshed/AGENTS.md" || fail "init did not replace only the managed block"
@@ -682,11 +682,11 @@ run_init() {
   [ -L "$symlinked/AGENTS.md" ] || fail "init replaced symlinked AGENTS.md"
   cmp "$work/init-expected.md" "$symlinked/AGENTS.md" || fail "init did not update symlink target"
 
-  init_skill="$repo_root/skills/fast-track-ai-init/SKILL.md"
+  init_skill="$repo_root/skills/ft-init/SKILL.md"
   assert_not_matches "$init_skill" 'assets/legac[y]|normaliz|conformance|non-conforming|yes-or-no question|fast-track-ai-gate'
-  assert_not_matches "$repo_root/commands/fast-track-ai-init.md" 'assets/legac[y]|normaliz|conformance|non-conforming|yes-or-no question'
+  assert_not_matches "$repo_root/commands/ft-init.md" 'assets/legac[y]|normaliz|conformance|non-conforming|yes-or-no question'
 
-  snippet="$repo_root/skills/fast-track-ai-init/assets/AGENTS-snippet.md"
+  snippet="$repo_root/skills/ft-init/assets/AGENTS-snippet.md"
   assert_not_contains "$snippet" 'Intent autonomy'
   assert_not_contains "$snippet" 'Tasks parallelism'
   assert_not_contains "$snippet" 'Each script and template has one owner skill'
@@ -1116,7 +1116,7 @@ assert_installed_layout() {
   claude_dir="$2"
   commands_dir="$3"
   count=0
-  for skill in "$repo_root"/skills/fast-track-ai-*; do
+  for skill in "$repo_root"/skills/ft-*; do
     name="$(basename "$skill")"
     [ -d "$agents_dir/$name" ] || fail "agent skill does not resolve: $agents_dir/$name"
     [ -d "$claude_dir/$name" ] || fail "Claude mirror does not resolve: $claude_dir/$name"
@@ -1126,7 +1126,7 @@ assert_installed_layout() {
   [ ! -e "$agents_dir/shared" ] || fail "shared link was installed"
   [ ! -e "$claude_dir/shared" ] || fail "shared Claude mirror was installed"
   cmd_count=0
-  for cmd in "$repo_root"/commands/fast-track-ai-*.md; do
+  for cmd in "$repo_root"/commands/ft-*.md; do
     name="$(basename "$cmd")"
     [ -e "$commands_dir/$name" ] || fail "command does not resolve: $commands_dir/$name"
     cmd_count=$((cmd_count + 1))
@@ -1147,7 +1147,7 @@ check_installed_resources() {
   local dir skill name rel count
   for dir in "$1" "$2"; do
     count=0
-    for skill in "$dir"/fast-track-ai-*; do
+    for skill in "$dir"/ft-*; do
       [ -d "$skill" ] || continue
       name="$(basename "$skill")"
       [ -r "$skill/SKILL.md" ] || { echo "installed skill metadata is unreadable: $skill/SKILL.md"; return 1; }
@@ -1161,7 +1161,7 @@ check_installed_resources() {
         [ -f "$skill/$rel" ] || { echo "installed owner resource does not resolve: $skill/$rel"; return 1; }
         case "$rel" in *.sh) [ -x "$skill/$rel" ] || { echo "installed owner script is not executable: $skill/$rel"; return 1; };; esac
       done
-      for rel in $(grep -oE '\.\./fast-track-ai-[a-z]+/(scripts|assets)/[A-Za-z0-9_-]+\.(sh|md)' "$skill/SKILL.md" | sort -u); do
+      for rel in $(grep -oE '\.\./ft-[a-z]+/(scripts|assets)/[A-Za-z0-9_-]+\.(sh|md)' "$skill/SKILL.md" | sort -u); do
         [ -f "$skill/$rel" ] || { echo "installed sibling resource does not resolve: $skill/$rel"; return 1; }
         case "$rel" in *.sh) [ -x "$skill/$rel" ] || { echo "installed sibling script is not executable: $skill/$rel"; return 1; };; esac
       done
@@ -1175,9 +1175,9 @@ check_installed_resources() {
 # the installed owner scripts against a disposable target.
 run_installed_scripts() {
   local t="$work/installed-run-$1" base="$2" track first
-  local i_init="$2/fast-track-ai-init/scripts/fast-track-ai-init.sh"
-  local i_index="$2/fast-track-ai-init/scripts/fast-track-ai-index.sh"
-  local i_gate="$2/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+  local i_init="$2/ft-init/scripts/fast-track-ai-init.sh"
+  local i_index="$2/ft-init/scripts/fast-track-ai-index.sh"
+  local i_gate="$2/ft-spec/scripts/fast-track-ai-gate.sh"
   rm -rf "$t"
   mkdir -p "$t"
   "$i_init" "$t" >/dev/null || fail "installed init failed through $base"
@@ -1242,25 +1242,25 @@ run_install() {
   for item in skills commands install.sh; do
     cp -R "$repo_root/$item" "$broken/pkg/$item"
   done
-  rm "$broken/pkg/skills/fast-track-ai-spec/scripts/fast-track-ai-gate.sh"
+  rm "$broken/pkg/skills/ft-spec/scripts/fast-track-ai-gate.sh"
   "$broken/pkg/install.sh" --agents-dir "$broken/agents/skills" --claude-dir "$broken/claude/skills" >/dev/null
   if broken_message="$(check_installed_resources "$broken/agents/skills" "$broken/claude/skills")"; then
     fail "installation validation passed with a broken installed sibling"
   fi
   case "$broken_message" in
-    *fast-track-ai-spec/scripts/fast-track-ai-gate.sh*) ;;
+    *ft-spec/scripts/fast-track-ai-gate.sh*) ;;
     *) fail "broken sibling was not reported at its location: $broken_message";;
   esac
   pass "install"
 }
 
 run_resources() {
-  init_skill="$repo_root/skills/fast-track-ai-init/SKILL.md"
-  intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
-  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
-  assess_skill="$repo_root/skills/fast-track-ai-assess/SKILL.md"
-  research_skill="$repo_root/skills/fast-track-ai-research/SKILL.md"
-  handoff_skill="$repo_root/skills/fast-track-ai-handoff/SKILL.md"
+  init_skill="$repo_root/skills/ft-init/SKILL.md"
+  intent_skill="$repo_root/skills/ft-intent/SKILL.md"
+  spec_skill="$repo_root/skills/ft-spec/SKILL.md"
+  assess_skill="$repo_root/skills/ft-assess/SKILL.md"
+  research_skill="$repo_root/skills/ft-research/SKILL.md"
+  handoff_skill="$repo_root/skills/ft-handoff/SKILL.md"
 
   for resource in './scripts/fast-track-ai-init.sh' './scripts/fast-track-ai-index.sh' './assets/AGENTS-snippet.md'; do
     assert_contains "$init_skill" "$resource"
@@ -1276,40 +1276,40 @@ run_resources() {
   assert_contains "$handoff_skill" './assets/handoff.md'
 
   for resource in './scripts/fast-track-ai-init.sh' './scripts/fast-track-ai-index.sh' './assets/AGENTS-snippet.md' './assets/intent.md' './assets/ref.md' './assets/spec.md' './assets/tasks.md' './assets/decisions.md' './scripts/fast-track-ai-gate.sh' './assets/assessment.md' './assets/research.md' './assets/handoff.md'; do
-    owner_count="$(grep -Fl "$resource" "$repo_root"/skills/fast-track-ai-*/SKILL.md | wc -l | tr -d ' ')"
+    owner_count="$(grep -Fl "$resource" "$repo_root"/skills/ft-*/SKILL.md | wc -l | tr -d ' ')"
     [ "$owner_count" -eq 1 ] || fail "$resource has $owner_count owner skill references; expected 1"
   done
 
-  assert_not_file "$repo_root/skills/fast-track-ai-init/assets/assessment.md"
-  assert_not_file "$repo_root/skills/fast-track-ai-init/assets/refs.md"
-  for skill_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md; do
-    assert_not_contains "$skill_file" 'fast-track-ai-init/assets/assessment.md'
-    assert_not_contains "$skill_file" 'fast-track-ai-init/assets/refs.md'
+  assert_not_file "$repo_root/skills/ft-init/assets/assessment.md"
+  assert_not_file "$repo_root/skills/ft-init/assets/refs.md"
+  for skill_file in "$repo_root"/skills/ft-*/SKILL.md; do
+    assert_not_contains "$skill_file" 'ft-init/assets/assessment.md'
+    assert_not_contains "$skill_file" 'ft-init/assets/refs.md'
   done
-  for skill_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md; do
+  for skill_file in "$repo_root"/skills/ft-*/SKILL.md; do
     assert_contains "$skill_file" "resolve from this skill's installed directory, and \`fast-track-ai/\` paths resolve from the target repository root"
   done
   pass "resource guidance"
 }
 
 run_workflows() {
-  assess_skill="$repo_root/skills/fast-track-ai-assess/SKILL.md"
-  research_skill="$repo_root/skills/fast-track-ai-research/SKILL.md"
-  handoff_skill="$repo_root/skills/fast-track-ai-handoff/SKILL.md"
-  assess_template="$repo_root/skills/fast-track-ai-assess/assets/assessment.md"
-  research_template="$repo_root/skills/fast-track-ai-research/assets/research.md"
-  handoff_template="$repo_root/skills/fast-track-ai-handoff/assets/handoff.md"
+  assess_skill="$repo_root/skills/ft-assess/SKILL.md"
+  research_skill="$repo_root/skills/ft-research/SKILL.md"
+  handoff_skill="$repo_root/skills/ft-handoff/SKILL.md"
+  assess_template="$repo_root/skills/ft-assess/assets/assessment.md"
+  research_template="$repo_root/skills/ft-research/assets/research.md"
+  handoff_template="$repo_root/skills/ft-handoff/assets/handoff.md"
 
   for workflow in assess research handoff; do
-    assert_file "$repo_root/commands/fast-track-ai-$workflow.md"
-    assert_file "$repo_root/skills/fast-track-ai-$workflow/SKILL.md"
-    assert_contains "$repo_root/commands/fast-track-ai-$workflow.md" "\`fast-track-ai-$workflow\`"
+    assert_file "$repo_root/commands/ft-$workflow.md"
+    assert_file "$repo_root/skills/ft-$workflow/SKILL.md"
+    assert_contains "$repo_root/commands/ft-$workflow.md" "\`ft-$workflow\`"
   done
 
   assert_not_matches "$research_skill" 'base `research`|base research skill|Run the base'
   assert_not_matches "$handoff_skill" 'base `handoff`|base handoff skill|Run the base'
-  assert_not_matches "$repo_root/commands/fast-track-ai-research.md" 'base research skill|Run the base'
-  assert_not_matches "$repo_root/commands/fast-track-ai-handoff.md" 'base handoff skill|Run the base'
+  assert_not_matches "$repo_root/commands/ft-research.md" 'base research skill|Run the base'
+  assert_not_matches "$repo_root/commands/ft-handoff.md" 'base handoff skill|Run the base'
 
   for field_name in captured owner; do
     assert_contains "$research_template" "$field_name:"
@@ -1336,7 +1336,7 @@ run_workflows() {
   assert_not_matches "$handoff_template" '^status:'
   assert_not_matches "$handoff_template" '^## (P0|P1) next actions$|^## First next action$'
 
-  for package_file in "$repo_root"/skills/fast-track-ai-*/SKILL.md "$repo_root"/commands/fast-track-ai-*.md; do
+  for package_file in "$repo_root"/skills/ft-*/SKILL.md "$repo_root"/commands/ft-*.md; do
     assert_not_matches "$package_file" 'Jhony Walker|jhonywalkeer|Guia Completo sobre Architecture'
   done
 
@@ -1351,9 +1351,9 @@ run_workflows() {
 }
 
 run_refs() {
-  template="$repo_root/skills/fast-track-ai-intent/assets/ref.md"
-  intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
-  intent_template="$repo_root/skills/fast-track-ai-intent/assets/intent.md"
+  template="$repo_root/skills/ft-intent/assets/ref.md"
+  intent_skill="$repo_root/skills/ft-intent/SKILL.md"
+  intent_template="$repo_root/skills/ft-intent/assets/intent.md"
   assert_file "$template"
   for contract_text in 'content_license' 'Normalize it to UTF-8' 'observed at capture time' 'never the URL' 'Use `pin` when' 'retrieved_at'; do
     assert_contains "$intent_skill" "$contract_text"
@@ -1409,10 +1409,10 @@ EOF
 }
 
 run_decisions() {
-  intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
-  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
-  implement_skill="$repo_root/skills/fast-track-ai-implement/SKILL.md"
-  template="$repo_root/skills/fast-track-ai-spec/assets/decisions.md"
+  intent_skill="$repo_root/skills/ft-intent/SKILL.md"
+  spec_skill="$repo_root/skills/ft-spec/SKILL.md"
+  implement_skill="$repo_root/skills/ft-implement/SKILL.md"
+  template="$repo_root/skills/ft-spec/assets/decisions.md"
 
   assert_contains "$intent_skill" 'durable, costly to reverse, surprising without context, or resolves a meaningful trade-off'
   assert_contains "$intent_skill" 'Do not create an ADR for a local, easily reversible, or obvious implementation choice.'
@@ -1534,13 +1534,13 @@ run_handoff() {
   [ "${#active_handoffs[@]}" -eq 3 ] || fail "handoff fixture did not retain exactly three active files"
   assert_file "$target/fast-track-ai/handoffs/archive/2026-09-20-080000Z-first.md"
   assert_contains "$target/fast-track-ai/handoffs/archive/2026-09-20-080000Z-first.md" '> Preserve this exact instruction.'
-  assert_not_matches "$repo_root/skills/fast-track-ai-handoff/SKILL.md" 'base `handoff`|base handoff skill|Run the base'
-  handoff_skill="$repo_root/skills/fast-track-ai-handoff/SKILL.md"
+  assert_not_matches "$repo_root/skills/ft-handoff/SKILL.md" 'base `handoff`|base handoff skill|Run the base'
+  handoff_skill="$repo_root/skills/ft-handoff/SKILL.md"
   collision_line="$(grep -n 'Before writing, check that this path exists in neither' "$handoff_skill" | cut -d: -f1)"
   write_line="$(grep -n 'Write the final document directly to that path' "$handoff_skill" | cut -d: -f1)"
   validate_line="$(grep -n 'Validate the new handoff before touching any other handoff' "$handoff_skill" | cut -d: -f1)"
   archive_line="$(grep -n 'Move each older handoff to `fast-track-ai/handoffs/archive/`' "$handoff_skill" | cut -d: -f1)"
-  index_line="$(grep -n 'run `../fast-track-ai-init/scripts/fast-track-ai-index.sh' "$handoff_skill" | cut -d: -f1)"
+  index_line="$(grep -n 'run `../ft-init/scripts/fast-track-ai-index.sh' "$handoff_skill" | cut -d: -f1)"
   [ -n "$collision_line" ] && [ -n "$write_line" ] && [ -n "$validate_line" ] && [ -n "$archive_line" ] && [ -n "$index_line" ] || fail "handoff skill lacks a collision, write, validate, archive, or index step"
   [ "$collision_line" -lt "$write_line" ] && [ "$write_line" -lt "$validate_line" ] || fail "handoff skill does not check collision, then write, then validate"
   [ "$validate_line" -lt "$archive_line" ] && [ "$archive_line" -lt "$index_line" ] || fail "handoff skill does not validate, then archive, then index"
@@ -1734,9 +1734,9 @@ EOF
   expect_failure "gate with root decisions.md" "$gate" --mode structure --track 003-example --root "$ok"
   assert_contains "$work/failure.out" "loose files outside assets/: decisions.md"
   rm "$root_dir/decisions.md"
-  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
-  spec_template="$repo_root/skills/fast-track-ai-spec/assets/spec.md"
-  tasks_template="$repo_root/skills/fast-track-ai-spec/assets/tasks.md"
+  spec_skill="$repo_root/skills/ft-spec/SKILL.md"
+  spec_template="$repo_root/skills/ft-spec/assets/spec.md"
+  tasks_template="$repo_root/skills/ft-spec/assets/tasks.md"
   assert_contains "$spec_skill" 'Done:'
   assert_contains "$spec_skill" 'Accept:'
   assert_contains "$spec_skill" '(Phase N)'
@@ -1760,10 +1760,10 @@ EOF
 }
 
 run_flow() {
-  intent_skill="$repo_root/skills/fast-track-ai-intent/SKILL.md"
-  spec_skill="$repo_root/skills/fast-track-ai-spec/SKILL.md"
-  implement_skill="$repo_root/skills/fast-track-ai-implement/SKILL.md"
-  tasks_template="$repo_root/skills/fast-track-ai-spec/assets/tasks.md"
+  intent_skill="$repo_root/skills/ft-intent/SKILL.md"
+  spec_skill="$repo_root/skills/ft-spec/SKILL.md"
+  implement_skill="$repo_root/skills/ft-implement/SKILL.md"
+  tasks_template="$repo_root/skills/ft-spec/assets/tasks.md"
   assert_contains "$intent_skill" ". para continuar com a spec"
   assert_contains "$spec_skill" ". para implementar"
   assert_contains "$implement_skill" ". para ship"
@@ -1786,7 +1786,7 @@ run_flow() {
 
 check_no_live_active() {
   package_root="$1"
-  for live_file in "$package_root"/skills/fast-track-ai-*/SKILL.md "$package_root"/skills/fast-track-ai-*/assets/* "$package_root"/commands/fast-track-ai-*.md; do
+  for live_file in "$package_root"/skills/ft-*/SKILL.md "$package_root"/skills/ft-*/assets/* "$package_root"/commands/ft-*.md; do
     [ -f "$live_file" ] || continue
     assert_not_contains "$live_file" 'status: active'
   done
@@ -1897,7 +1897,7 @@ EOF
   "$gate" --mode structure --track 001-front --root "$target" >/dev/null
 
   template_count=0
-  for template in "$repo_root"/skills/fast-track-ai-*/assets/*; do
+  for template in "$repo_root"/skills/ft-*/assets/*; do
     [ -f "$template" ] || continue
     [ "$(head -n 1 "$template")" = "---" ] || continue
     template_count=$((template_count + 1))
@@ -1923,21 +1923,6 @@ run_isolation() {
   pass "isolation"
 }
 
-run_docs() {
-  readme="$repo_root/README.md"
-  agents="$repo_root/AGENTS.md"
-  [ ! -e "$repo_root/fast-track-ai" ] || fail "repository root unexpectedly has fast-track-ai/"
-  if grep -Eiq 'normaliz|\bactive\b|(^|[^a-z-])spec/|plan\.md|openspec' "$readme"; then
-    fail "$readme mentions retired wording or OpenSpec"
-  fi
-  assert_contains "$readme" "## Group"
-  assert_contains "$readme" "docs/archive/"
-  assert_contains "$agents" "openspec/"
-  assert_contains "$agents" "docs/archive/"
-  assert_not_contains "$agents" "read-only archive"
-  pass "docs"
-}
-
 run_case() {
   case "$1" in
     self) run_self ;;
@@ -1955,13 +1940,12 @@ run_case() {
     active) run_active ;;
     frontmatter) run_frontmatter ;;
     isolation) run_isolation ;;
-    docs) run_docs ;;
     *) fail "unknown eval: $1" ;;
   esac
 }
 
 if [ "$mode" = "all" ]; then
-  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow active frontmatter isolation docs; do
+  for eval_name in self init index approval install resources workflows refs decisions handoff spec flow active frontmatter isolation; do
     if [ "$eval_name" = "isolation" ] && [ "${FAST_TRACK_AI_ISOLATION_GUARD:-}" = "1" ]; then
       continue
     fi

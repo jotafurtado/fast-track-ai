@@ -21,3 +21,7 @@ Thumbs.db
 
 # Scratch test dirs
 /tmp/
+
+# Local maintainer specifications and diagram authoring
+/openspec/
+/.archify/

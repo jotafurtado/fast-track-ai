@@ -51,7 +51,7 @@ relpath() {
 }
 
 mkdir -p "$agents_dir"
-for skill in "$method_root"/skills/fast-track-ai-*; do
+for skill in "$method_root"/skills/ft-*; do
   [ -d "$skill" ] || continue
   ln -sfn "$skill" "$agents_dir/$(basename "$skill")"
   echo "linked $(basename "$skill") -> $agents_dir"
@@ -59,7 +59,8 @@ done
 
 if [ -d "$(dirname "$claude_dir")" ]; then
   mkdir -p "$claude_dir"
-  for link in "$agents_dir"/fast-track-ai-*; do
+  for skill in "$method_root"/skills/ft-*; do
+    link="$agents_dir/$(basename "$skill")"
     [ -e "$link" ] || continue
     ln -sfn "$(relpath "$claude_dir" "$link")" "$claude_dir/$(basename "$link")"
   done
@@ -67,7 +68,7 @@ if [ -d "$(dirname "$claude_dir")" ]; then
 fi
 
 mkdir -p "$commands_dir"
-for cmd in "$method_root"/commands/fast-track-ai-*.md; do
+for cmd in "$method_root"/commands/ft-*.md; do
   [ -f "$cmd" ] || continue
   ln -sfn "$cmd" "$commands_dir/$(basename "$cmd")"
   echo "linked $(basename "$cmd") -> $commands_dir"

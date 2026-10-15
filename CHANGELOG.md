@@ -6,15 +6,22 @@ Notable changes to fast-track-ai are recorded here. Entries describe user and ma
 
 ### Added
 
+- Adoption-oriented README explaining the SDLC framework, with numbered steps, distinct human/agent lanes, artifact-review icons, explicit skill calls, and a grouped skill reference.
+- Complementary isometric illustration showing research, assessment, and handoff artifacts feeding the AI agent's documented project context.
+- Technical guide preserving the previous README and its detailed Mermaid workflows.
 - Optional real-agent workflow evaluation through Claude Code and Codex, alongside Kiro, with native session continuation and shared behavioral assertions.
 - Installed-resource validation through generic `.agents/skills` links and Claude mirrors, including bundled init, index, and gate execution in disposable projects.
 - A readiness matrix recording package fingerprints, CLI versions, model settings, and native evidence for each evaluated harness.
 
 ### Changed
 
+- BREAKING: Public skill directories, frontmatter names, and command wrappers now use `ft-*` (`ft-init`, `ft-intent`, `ft-spec`, `ft-implement`, `ft-research`, `ft-assess`, `ft-handoff`) without aliases. Reinstall the complete package and remove previous long-name installations. The target `fast-track-ai/` artifact tree and internal script basenames are unchanged.
 - Retained agent-eval diagnostics now use `<root>/<harness>/<scenario>` instead of `<root>/<scenario>`. Update scripts that consume diagnostic paths; invocations without `--harness` still select Kiro.
 - The spec approval transition completes as an approval-only action before product edits. Both approval artifacts may be updated together, without prescribing an editing tool.
-- Frozen package-building history lives under `docs/archive/fast-track-ai/`; the package repository does not run the method on itself.
+- Frozen package-building history lives under `.archive/fast-track-ai/`; the package repository does not run the method on itself.
+- Maintainer OpenSpec specifications are now local-only and ignored by Git; existing local files are preserved.
+- Retired the `docs` eval selector, which prescribed README wording and layout; runtime checks remain independent of the documentation structure.
+- The primary installation instructions use `npx skills` for the complete seven-skill package; the checkout installer remains documented as a maintainer alternative.
 
 ### Fixed
 

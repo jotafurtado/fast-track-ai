@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title description">
+<title id="title">Skills de apoio: contexto documentado para o Agente de IA</title>
+<desc id="description">ft-research gera pesquisas com fontes, ft-assess registra avaliações com evidências e ft-handoff preserva contexto para outras sessões. O Agente de IA consulta esses artefatos pelo índice do projeto. Os documentos são memória revisável no projeto, não memória automática do modelo. Chamadas com barra representam Claude Code; no Codex, use dólar e o nome da skill.</desc>
+<style>
+svg{--fg:#20213e;--muted:#68758e;--border:#dfe6f2;--surface:#fff;--c1:#4b25bd;--c2:#6795e8;--c3:#df654a;--c4:#bfe7dc;--c5:#edf3fc;--c6:#d9cdf6;color:var(--fg);font-family:"Avenir Next","Trebuchet MS",sans-serif}
+.heading{font-size:46px;font-weight:700;letter-spacing:-1.3px;fill:var(--fg)}
+.title{font-size:36px;font-weight:700;letter-spacing:-.7px;fill:var(--fg);text-anchor:middle}
+.body{font-size:25px;fill:var(--muted);text-anchor:middle}
+.command{font:25px ui-monospace,monospace;fill:var(--c1);text-anchor:middle}
+.path{font:21px ui-monospace,monospace;fill:var(--muted);text-anchor:middle}
+.route{fill:none;stroke:var(--c3);stroke-width:3;stroke-linecap:round;marker-end:url(#arrow)}
+</style>
+<defs>
+<marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto"><path d="M2 2 L10 6 L2 10" fill="none" stroke="var(--c3)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<g id="platform"><ellipse cx="8" cy="34" rx="174" ry="50" fill="var(--c2)" opacity=".09"/><path d="M-160 -36 L-20 44 L172 -20 L172 -2 L-20 62 L-160 -18 Z" fill="var(--c2)" opacity=".8"/><path d="M-20 44 L172 -20 L172 -2 L-20 62 Z" fill="var(--c1)" opacity=".86"/><path d="M-160 -36 L32 -100 L172 -20 L-20 44 Z" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/></g>
+<g id="document"><rect width="150" height="172" rx="16" fill="var(--c6)" transform="translate(12 14)"/><rect width="150" height="172" rx="16" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/><rect width="150" height="42" rx="16" fill="var(--c1)"/><path d="M0 25 H150 V42 H0" fill="var(--c1)"/><path d="M24 22 H120" stroke="var(--surface)" stroke-width="7" stroke-linecap="round"/><path d="M25 75 H122 M25 99 H112 M25 123 H118 M25 147 H93" stroke="var(--c2)" stroke-width="7" stroke-linecap="round"/></g>
+</defs>
+<text class="heading" x="72" y="91">Contexto que Fica no Projeto.</text>
+<text x="73" y="137" font-size="25" fill="var(--muted)">Use as skills de apoio a qualquer momento, sem iniciar uma implementação.</text>
+<path class="route" data-edge="research-context" d="M435 290 C530 290 613 350 665 414"/>
+<path class="route" data-edge="assess-context" d="M1165 290 C1070 290 991 350 941 414"/>
+<path class="route" data-edge="handoff-context" d="M947 802 C1180 774 1115 565 969 472"/>
+<g data-node="research" transform="translate(300 295)">
+<use href="#platform"/><g transform="matrix(.82 -.27 .68 .4 -107 -80)"><use href="#document"/><circle cx="112" cy="127" r="25" fill="var(--c5)" stroke="var(--c2)" stroke-width="5"/><path d="M130 146 L150 166" stroke="var(--c2)" stroke-width="8" stroke-linecap="round"/></g>
+<text class="title" y="139">Pesquisar</text><text class="command" y="183">/ft-research</text><text class="body" y="226">Fatos externos e fontes.</text><text class="path" y="265">research/slug.md</text>
+</g>
+<g data-node="assess" transform="translate(1300 295)">
+<use href="#platform"/><g transform="matrix(.82 -.27 .68 .4 -107 -80)"><use href="#document"/><circle cx="126" cy="130" r="28" fill="var(--c4)"/><path d="M111 128 L122 140 L143 115" fill="none" stroke="var(--c1)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text class="title" y="139">Avaliar</text><text class="command" y="183">/ft-assess</text><text class="body" y="226">Evidências e recomendações.</text><text class="path" y="265">assessments/YYYY-MM-DD-slug.md</text>
+</g>
+<g data-node="context" transform="translate(800 466)">
+<use href="#platform"/>
+<path d="M-59 -130 Q0 -158 65 -130 L61 -47 Q52 -12 2 14 Q-49 -12 -57 -46 Z" fill="var(--c1)"/>
+<path d="M-40 -114 Q0 -134 44 -114 L42 -53 Q32 -29 2 -11 Q-31 -29 -38 -53 Z" fill="var(--c6)"/>
+<rect x="-29" y="-99" width="63" height="49" rx="14" fill="var(--surface)"/>
+<circle cx="-9" cy="-77" r="5" fill="var(--c1)"/><circle cx="15" cy="-77" r="5" fill="var(--c1)"/>
+<path d="M-9 -62 H15 M2 -99 V-112" stroke="var(--c1)" stroke-width="4" stroke-linecap="round"/>
+<circle cx="2" cy="-116" r="5" fill="var(--c3)"/>
+<text class="title" y="129">Agente de IA</text><text class="body" y="173">Consulta o Contexto do Projeto</text><text class="path" y="214">fast-track-ai/INDEX.md</text>
+</g>
+<g data-node="handoff" transform="translate(800 840)">
+<use href="#platform"/>
+<g transform="matrix(.82 -.27 .68 .4 -107 -80)"><use href="#document"/><path d="M34 92 H112 M91 71 L113 92 L91 113" fill="none" stroke="var(--c3)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text class="title" y="122">Preservar Contexto</text><text class="command" y="164">/ft-handoff</text><text class="body" y="201">Para outra sessão, agente ou modelo.</text>
+</g>
+<path d="M73 1070 H1527" stroke="var(--border)" stroke-width="1.5"/>
+<text class="body" x="800" y="1101">Os artefatos são a memória documentada. O contexto não depende só da conversa.</text>
+</svg>
