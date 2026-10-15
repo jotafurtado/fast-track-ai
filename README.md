@@ -12,9 +12,9 @@ Você define o rumo e revisa as entregas. O agente documenta, planeja, implement
 
 ## 2. Como Funciona?
 
-Depois da inicialização, cada mudança segue o fluxo abaixo. Os números mostram a sequência; a raia de cima é sua, a de baixo é do agente.
+Depois da inicialização, cada mudança segue o fluxo abaixo. Os números mostram a sequência; os rótulos distinguem suas ações das ações do agente.
 
-![Fluxo numerado do Fast Track AI em duas raias. Você inicia o pedido, revisa a intenção, aprova o plano e confirma a conclusão. O agente documenta a intenção, planeja e implementa com validação. As skills correspondentes aparecem em cada etapa.](docs/images/workflow.png)
+![Fluxo numerado do Fast Track AI em arco aberto. Você inicia o pedido, revisa a intenção, aprova o plano e confirma a conclusão. O agente documenta a intenção, planeja e implementa com validação. As skills correspondentes aparecem em cada etapa.](docs/images/workflow.png)
 
 As imagens usam a chamada do [Claude Code](https://code.claude.com/docs/en/skills): `/ft-intent`. No [Codex](https://developers.openai.com/codex/skills), use `$ft-intent` ou o seletor `/skills`. Nos demais harnesses, você também pode pedir `Use a skill ft-intent para <objetivo>`.
 
@@ -29,9 +29,19 @@ A confirmação final marca a mudança como concluída. Não faz commit, push ou
 
 Pesquisas, avaliações e handoffs podem ser chamados a qualquer momento. Eles geram documentos que o Agente de IA consulta pelo índice do projeto, sem iniciar uma implementação.
 
-![Agente de IA no centro consultando a memória documentada do projeto. ft-research produz pesquisas com fontes; ft-assess produz avaliações com evidências; ft-handoff preserva contexto para outras sessões.](docs/images/support-context.png)
+![Agente de IA no centro consultando o índice e cinco tipos de artefato: referências, pesquisas, avaliações, decisões e handoffs. Pesquisas, avaliações e handoffs têm skills próprias; referências e decisões são registradas durante o fluxo.](docs/images/support-context.png)
 
-Essa memória fica nos arquivos, não depende de o modelo lembrar de conversas anteriores.
+Essa memória fica nos arquivos, não depende de o modelo lembrar de conversas anteriores. Os cinco tipos de artefato de apoio são:
+
+| Artefato | O Que Preserva | Onde Fica |
+|---|---|---|
+| **Referência (`ref`)** | Material fornecido por você, como uma URL, um documento ou um trecho de código externo que fundamenta a mudança. | `fast-track-ai/refs/<slug>.md` |
+| **Pesquisa (`research`)** | Fatos externos, alternativas e fontes consultadas pelo agente. | `fast-track-ai/research/<slug>.md` |
+| **Avaliação (`assessment`)** | Evidências sobre o estado atual do que foi avaliado, com limitações e recomendações. | `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md` |
+| **Decisão (`decision` ou ADR)** | O que foi decidido, por quê e quais consequências a escolha traz. | `fast-track-ai/decisions/<NNN-slug>.md` |
+| **Handoff** | O contexto necessário para continuar em outra sessão, agente ou modelo. | `fast-track-ai/handoffs/<timestamp>-<slug>.md` |
+
+**Referências e decisões não têm comandos próprios.** O agente registra as referências ao preparar a intenção, quando o material fornecido fundamenta a mudança. Decisões relevantes são registradas ao longo da intenção, do planejamento ou da implementação: escolhas duradouras, difíceis de reverter ou que precisam de contexto para serem compreendidas. Não é preciso pedir um documento separado para cada uma.
 
 ## 3. Como Usar?
 

@@ -25,3 +25,6 @@ Thumbs.db
 # Local maintainer specifications and diagram authoring
 /openspec/
 /.archify/
+
+# Local-only history and discarded artwork
+/.archive/

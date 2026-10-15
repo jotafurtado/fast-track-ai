@@ -2,7 +2,7 @@
 
 Para instalar e começar, veja o [README](../README.md). Este guia preserva os fluxos detalhados e explica os artefatos, as aprovações e as validações do método.
 
-O [fluxo principal em PNG](images/workflow.png) tem uma [fonte vetorial editável](images/workflow.svg). Os diagramas abaixo continuam em Mermaid para detalhar os caminhos que não precisam aparecer no início rápido.
+O [fluxo principal em PNG](images/workflow.png) tem uma [fonte vetorial editável](images/workflow.svg), assim como a [arte dos artefatos de apoio](images/support-context.png), com sua [fonte em SVG](images/support-context.svg). Os diagramas abaixo continuam em Mermaid para detalhar os caminhos que não precisam aparecer no início rápido.
 
 Método leve de SDLC para agente. Um pedido de mudança vira track. A track só vira código depois de `spec.md` e `tasks.md` com `status: approved`.
 
@@ -208,7 +208,7 @@ commands/                 wrappers dos 7 comandos
 skills/ft-*/   skill, template e script de cada comando
 install.sh                links no harness
 evals/                    suite de evals do mantenedor
-.archive/                 histórico congelado de como o pacote foi construído
+.archive/                 histórico e propostas descartadas, somente locais e ignorados pelo Git
 ```
 
 Cada script e cada template tem uma skill dona. Outra skill aponta para a cópia da dona. Não existe pasta `shared`.
