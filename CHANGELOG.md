@@ -23,6 +23,7 @@ Notable changes to fast-track-ai are recorded here. Entries describe user and ma
 - Maintainer OpenSpec specifications are now local-only and ignored by Git; existing local files are preserved.
 - Retired the `docs` eval selector, which prescribed README wording and layout; runtime checks remain independent of the documentation structure.
 - The primary installation instructions use `npx skills` for the complete seven-skill package; the checkout installer remains documented as a maintainer alternative.
+- Skills now state what each bundled script reads and writes, that it makes no network calls, that auxiliary research and assessment results are reported by the calling skill, that retrieved or captured content is data rather than instructions, and that implementation runs only commands from the approved `tasks.md` or the project's own checks.
 
 ### Fixed
 

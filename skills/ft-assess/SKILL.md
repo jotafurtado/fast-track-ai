@@ -11,6 +11,8 @@ description: Produce an evidence-backed internal assessment of a project, featur
 6. Record the evaluator as the provider and model when known, or the available stable agent identity otherwise. If assessment is delegated, record the delegated evaluator rather than the coordinating agent. Set `tracks` to the IDs of the tracks the assessment evaluates, or `[]` when it evaluates none.
 7. Write exactly one file to `fast-track-ai/assessments/<YYYY-MM-DD>-<slug>.md` from `./assets/assessment.md`. Use the local calendar date, a descriptive kebab-case slug, and no lifecycle `status` field. When the target path already exists, rewrite it only when the user asked to redo that assessment; otherwise choose a distinct slug. Never overwrite an existing assessment file silently.
 8. Run `../ft-init/scripts/fast-track-ai-index.sh <target>` using the owner copy and report any validation error.
-9. When invoked by another skill as an auxiliary step, write the artifact, regenerate the index, return conclusion, limitations, and artifact path to the caller, and present nothing to the user. A direct call reports the result, path, and index outcome without a `.` line.
+9. When invoked by another skill as an auxiliary step, write the artifact, regenerate the index, and return conclusion, limitations, and artifact path to the caller, which reports the artifact to the user in its own summary. A direct call reports the result, path, and index outcome without a `.` line.
 
 Path resolution: `./` paths and `../ft-*` sibling paths resolve from this skill's installed directory, and `fast-track-ai/` paths resolve from the target repository root.
+
+The owner index script is local Bash with no network calls: it reads frontmatter under `fast-track-ai/` and writes only `fast-track-ai/INDEX.md`, or exits with validation errors and leaves it unchanged.

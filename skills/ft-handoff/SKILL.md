@@ -14,3 +14,5 @@ description: Capture portable working context directly under fast-track-ai/hando
 9. Only after archiving, run `../ft-init/scripts/fast-track-ai-index.sh <target>` using the owner copy and report any validation error.
 
 Path resolution: `./` paths and `../ft-*` sibling paths resolve from this skill's installed directory, and `fast-track-ai/` paths resolve from the target repository root.
+
+The owner index script is local Bash with no network calls: it reads frontmatter under `fast-track-ai/` and writes only `fast-track-ai/INDEX.md`, or exits with validation errors and leaves it unchanged.

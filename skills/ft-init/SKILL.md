@@ -8,3 +8,5 @@ description: Installs the fast-track-ai tree into a target repo, idempotently. U
 3. Run `./scripts/fast-track-ai-index.sh [target-dir]` from this skill and report the result.
 
 Path resolution: `./` paths and `../ft-*` sibling paths resolve from this skill's installed directory, and `fast-track-ai/` paths resolve from the target repository root.
+
+Bundled scripts are local Bash with no network calls: `fast-track-ai-init.sh` creates the `fast-track-ai/` tree, the `INDEX.md` seed, and the managed block in the target `AGENTS.md`; `fast-track-ai-index.sh` reads frontmatter under `fast-track-ai/` and writes only `fast-track-ai/INDEX.md`, or exits with validation errors and leaves it unchanged.
