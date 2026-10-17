@@ -4,6 +4,8 @@ Notable changes to fast-track-ai are recorded here. Entries describe user and ma
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-17
+
 ### Added
 
 - Adoption-oriented README explaining the SDLC framework, with numbered human/agent steps, explicit skill calls, and a grouped skill reference.
